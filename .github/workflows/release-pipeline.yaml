@@ -48,6 +48,12 @@ jobs:
             -f "ref=refs/tags/v${{ inputs.release_version }}" \
             -f "sha=${{ github.sha }}"
 
+      - name: Create Explicit Tag
+        if: inputs.release_version
+        run: |
+          git tag "v${{ inputs.release_version }}" "${{ github.sha }}"
+          git push origin "v${{ inputs.release_version }}"
+
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

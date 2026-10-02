@@ -21,12 +21,95 @@
 ;; Begin function defintions.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; spawn one bullet that can hurt Jak
+(defun bh-spawn-bullet ((pos vector) (dir vector) (speed float))
+
+  (let ((vel (new 'stack-no-clear 'vector))
+
+        (proc (get-process *default-dead-pool* projectile-yellow #x4000)))
+
+    (vector-float*! vel dir speed)
+
+    (when proc
+
+      ((method-of-type projectile-yellow activate)
+       (the-as projectile-yellow proc) *target* 'projectile-yellow (the-as pointer #x70004000))
+      ((the-as (function process function object object object object object object) run-function-in-process)
+       proc projectile-init-by-other (the-as entity-actor #f) pos vel 0 (the-as handle #f))
+      (set!
+        (-> (the-as sphere
+              (-> (the-as projectile-yellow proc)
+                  root root-prim local-sphere))
+            r)
+        (* (-> (the-as sphere
+              (-> (the-as projectile-yellow proc)
+                  root root-prim local-sphere))
+            r)
+          0.25))
+
+      (set! (-> (the-as projectile-yellow proc) attack-mode) 'damage)
+
+      (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target))))
+
+  0)
+
+(defun bh-ring ((center vector) (n int) (offset float) (speed float))
+  (let ((pos (new 'stack-no-clear 'vector))
+        (dir (new 'stack-no-clear 'vector)))
+    (dotimes (i n)
+      (let ((ang (+ offset (* (/ 65536.0 (the float n)) (the float i)))))
+        (set-vector! dir (sin ang) 0.0 (cos ang) 1.0)
+        (set-vector! pos (-> center x) (+ (-> center y) (meters 2.3)) (-> center z) 1.0)
+        (bh-spawn-bullet pos dir speed))))
+  0)
+
+(define *bh-next-ring* 0)
+(define *bh-spin* 0.0)
+(define *bh-center* (new 'global 'vector))
+
+(defun bullet-hell-update ()
+  (when *target*
+    (when (>= (current-time) *bh-next-ring*)
+      (vector-z-quaternion! *bh-center* (-> *target* control quat))
+      (vector+*! *bh-center* (-> *target* control trans) *bh-center* (meters 16.0))
+      (bh-ring *bh-center* 12 *bh-spin* (meters 12.0))
+      (+! *bh-spin* 2000.0)
+      (set! *bh-next-ring* (+ (current-time) (seconds 1.5)))))
+  0)
+
+;; set one init-spec's value (and clear its random range)
+(defun bh-set-spec ((part-id int) (idx int) (val float))
+  (set! (-> *part-id-table* part-id init-specs idx initial-valuef) val)
+  (set! (-> *part-id-table* part-id init-specs idx random-rangef) 0.0)
+  0)
+
+(defun bh-tint-particles ()
+  ;; ---- flight trail: red, more opaque ----
+  (bh-set-spec 350 8 128.0) (bh-set-spec 350 9 0.0) (bh-set-spec 350 10 96.0)   ;; glow: r, g, alpha
+  (bh-set-spec 351 7 128.0) (bh-set-spec 351 8 0.0) (bh-set-spec 351 9 128.0)   ;; puff
+  (bh-set-spec 352 2 (meters 1.0)) ;; (bh-set-spec 352 7 255.0) (bh-set-spec 352 5 255.0) (bh-set-spec 352 6 255.0) (bh-set-spec 352 7 255.0) ;; Smoke trail (core)
+  (bh-set-spec 353 5 140.0) (bh-set-spec 353 6 0.0) (bh-set-spec 353 8 128.0)   ;; sparks
+  (bh-set-spec 353 1 0.1)
+
+  ;; ---- spawn flash (group 103): remove green/blue ----
+  (bh-set-spec 355 5 255.0) (bh-set-spec 355 6 0.0)                              ;; starflash
+  (bh-set-spec 356 4 200.0) (bh-set-spec 356 5 0.0)                              ;; sparks
+  (bh-set-spec 357 8 160.0) (bh-set-spec 357 9 0.0) (bh-set-spec 357 10 0.0)    ;; puffs
+  (bh-set-spec 359 7 200.0) (bh-set-spec 359 8 0.0)                              ;; embers
+
+  ;; ---- explosion (group 104) ----
+  (bh-set-spec 2059 4 255.0) (bh-set-spec 2059 5 0.0)                            ;; big flash
+  (bh-set-spec 2060 4 220.0) (bh-set-spec 2060 5 0.0)                            ;; sparks
+  (bh-set-spec 2061 5 255.0) (bh-set-spec 2061 6 0.0) (bh-set-spec 2061 7 0.0)  ;; smoke puffs
+  (bh-set-spec 2062 5 255.0) (bh-set-spec 2062 6 0.0)                            ;; streaks
+  0)
+
 (defun runs-every-frame ()
-  ;;(increase-power-cell-by-one) This is a call to increase-power-cell-by-one defined in mod-common-functions.gc
   (if *show-input-display* (input-display-on) (input-display-off))
-  ;; ensure orb-placer is spawned/killed as requested, debug menu is updated
   (when *debug-segment*
     (orb-placer-maintenance))
+  (bullet-hell-update)
+  (bh-tint-particles)
   (none))
 
 (defun runs-on-orb-pickup ((parent process-tree))

@@ -21,6 +21,8 @@
 ;; Begin function defintions.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define *bh-difficulty* 0.0)
+
 ;; spawn one bullet that can hurt Jak
 (defun bh-spawn-bullet ((pos vector) (dir vector) (speed float))
 
@@ -53,28 +55,97 @@
 
   0)
 
-(defun bh-ring ((center vector) (n int) (offset float) (speed float))
-  (let ((pos (new 'stack-no-clear 'vector))
-        (dir (new 'stack-no-clear 'vector)))
+(defun bh-ring ((center vector) (n int) (offset float) (radius float))
+  (let* ((pos (new 'stack-no-clear 'vector))
+         (dir (new 'stack-no-clear 'vector)))
     (dotimes (i n)
-      (let ((ang (+ offset (* (/ 65536.0 (the float n)) (the float i)))))
-        (set-vector! dir (sin ang) 0.0 (cos ang) 1.0)
-        (set-vector! pos (-> center x) (+ (-> center y) (meters 2.3)) (-> center z) 1.0)
-        (bh-spawn-bullet pos dir speed))))
+      (let* ((ang (+ offset
+                     (* (/ 65536.0 (the float n))
+                        (the float i)))))
+        (set-vector!
+          pos
+          (+ (-> center x)
+             (* (sin ang) radius))
+          (+ (-> center y) (meters 2.3))
+          (+ (-> center z)
+             (* (cos ang) radius))
+          1.0)
+        (set-vector!
+          dir
+          (- (sin ang))
+          0.0
+          (- (cos ang))
+          1.0)
+        (bh-spawn-bullet pos dir (meters 12.0)))))
   0)
 
 (define *bh-next-ring* 0)
 (define *bh-spin* 0.0)
 (define *bh-center* (new 'global 'vector))
 
-(defun bullet-hell-update ()
+(defun bh-rain ((center vector) (gridSize int) (spacing float) (height float) (speed float))
+  (let* ((pos (new 'stack-no-clear 'vector))
+         (dir (new 'stack-no-clear 'vector))
+         (half (/ (- gridSize 1) 2)))
+    (set-vector! dir 0.0 -1.0 0.0 1.0)
+
+    (dotimes (x gridSize)
+      (dotimes (z gridSize)
+        (set-vector!
+          pos
+          (+ (-> center x)
+             (* (the float (- x half)) spacing))
+          (+ (-> center y) height)
+          (+ (-> center z)
+             (* (the float (- z half)) spacing))
+          1.0)
+
+        (bh-spawn-bullet pos dir speed))))
+  0)
+
+(defun bh-spawn-pattern ()
   (when *target*
+    (vector-z-quaternion!
+      *bh-center*
+      (-> *target* control quat))
+    (vector+!
+      *bh-center*
+      (-> *target* control trans)
+      *bh-center*)
+
+    ;; Choose between currently unlocked patterns.
+    (let* ((pattern (rand-vu-int-count 2)))
+      (if (= pattern 0)
+
+        ;; Ring
+        (bh-ring
+          *bh-center*
+          12
+          *bh-spin*
+          (meters 8.0))
+
+        ;; Rain
+        (bh-rain
+          *bh-center*
+          5
+          (meters 2.0)
+          (meters 12.0)
+          (meters 10.0)))))
+  0)
+
+(defun bullet-hell-update ()
+
+  (when *target*
+
     (when (>= (current-time) *bh-next-ring*)
-      (vector-z-quaternion! *bh-center* (-> *target* control quat))
-      (vector+*! *bh-center* (-> *target* control trans) *bh-center* (meters 16.0))
-      (bh-ring *bh-center* 12 *bh-spin* (meters 12.0))
+
+      (bh-spawn-pattern)
+
       (+! *bh-spin* 2000.0)
-      (set! *bh-next-ring* (+ (current-time) (seconds 1.5)))))
+
+      (set! *bh-next-ring*
+            (+ (current-time) (seconds 1.5)))))
+
   0)
 
 ;; set one init-spec's value (and clear its random range)
@@ -176,9 +247,4 @@
      ;; Code here runs after jak dies (and any death cutscene finishes), during the blackout before he spawns
      ))
   (none))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; deprecated function defintions.
-;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#| these are no longer recommended/supported however we include them anyways to not break anyones mods. |#
+  

@@ -21,7 +21,8 @@
 ;; Begin function defintions.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define *bh-difficulty* 0.0)
+(define bh-difficulty 0.0)
+(define bh-power-cells 0)
 
 ;; spawn one bullet that can hurt Jak
 (defun bh-spawn-bullet ((pos vector) (dir vector) (lifetime float) (speed float) (options uint))
@@ -135,12 +136,21 @@
           *bh-center*
           4                 ;; Amount
           (meters 7.0)      ;; Distance Spacing
-          (meters 13.0)     ;; Height
-          1.8               ;; Lifetime
-          (meters 12.0))))) ;; Speed
+          (meters 14.0)     ;; Height
+          2.0               ;; Lifetime
+          (meters 11.0))))) ;; Speed
+  0)
+
+(defun bh-update-difficulty ()
+  (set! bh-power-cells (the int (-> *game-info* fuel)))
+  ;; 0.0 at 0 cells, 1.0 at 101 cells
+  (set! bh-difficulty
+        (fmax 0.0 (fmin 1.0 (/ (the float bh-power-cells) 101.0))))
   0)
 
 (defun bullet-hell-update ()
+
+  (bh-update-difficulty)
 
   (when *target*
 
@@ -189,12 +199,29 @@
   (bh-set-spec 2059 8 -8.0) ;; Flash fade
   0)
 
+(defun bh-debug-difficulty ()
+  (format #t "BH Power Cells: ~d  Difficulty: ~f" bh-power-cells bh-difficulty)
+  0)
+
 (defun runs-every-frame ()
   (if *show-input-display* (input-display-on) (input-display-off))
+
   (when *debug-segment*
     (orb-placer-maintenance))
+
+  (when (cpad-pressed? 0 l1)
+    (set! (-> *game-info* fuel) (fmax 0.0 (- (-> *game-info* fuel) 1.0)))
+    (bh-update-difficulty)
+    (bh-debug-difficulty))
+
+  (when (cpad-pressed? 0 r1)
+    (set! (-> *game-info* fuel) (+ (-> *game-info* fuel) 1.0))
+    (bh-update-difficulty)
+    (bh-debug-difficulty))
+
   (bullet-hell-update)
   (bh-tint-particles)
+
   (none))
 
 (defun runs-on-orb-pickup ((parent process-tree))

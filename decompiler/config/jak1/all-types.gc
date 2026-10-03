@@ -12900,6 +12900,7 @@
    (counter         int32           :offset-assert 400)
    (target-count    int32           :offset-assert 404)
    (sound-id        sound-id        :offset-assert 408)
+   (bh-homing       float           :offset-assert 412)
    )
   :heap-base #x130
   :method-count-assert 29

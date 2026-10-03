@@ -32,7 +32,7 @@
 (define bh-difficulty-start 0.0)
 (define bh-difficulty-target 0.0)
 (define bh-difficulty-time 0.0)
-(define bh-difficulty-peak 90.0)
+(define bh-difficulty-peak 80.0)
 (define bh-projectile-homing 0.0)
 
 ;; spawn one bullet that can hurt Jak

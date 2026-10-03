@@ -21,11 +21,19 @@
 ;; Begin function defintions.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define bh-difficulty 0.0)
 (define bh-power-cells 0)
+(define bh-difficulty 0.0)
+(define bh-difficulty-scale 1.0)
+(define bh-difficulty-scale-higher 1.0)
+(define bh-difficulty-scale-half 1.0)
+(define bh-difficulty-start 0.0)
+(define bh-difficulty-target 0.0)
+(define bh-difficulty-time 0.0)
+(define bh-difficulty-peak 90.0)
+(define bh-projectile-homing 0.0)
 
 ;; spawn one bullet that can hurt Jak
-(defun bh-spawn-bullet ((pos vector) (dir vector) (lifetime float) (speed float) (options uint))
+(defun bh-spawn-bullet ((pos vector) (dir vector) (lifetime float) (speed float) (options uint) (homing float))
 
   (let ((vel (new 'stack-no-clear 'vector))
 
@@ -55,7 +63,8 @@
           0.25))
 
       (set! (-> (the-as projectile-yellow proc) attack-mode) 'damage)
-
+      ;; (set! (-> (the-as projectile-yellow proc) max-turn) 0.0)
+      (set! (-> (the-as projectile-yellow proc) bh-homing) homing)
       (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target))))
 
   0)
@@ -81,10 +90,10 @@
           0.0
           (- (cos ang))
           1.0)
-        (bh-spawn-bullet pos dir lifetime speed (the-as uint 0)))))
+        (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) bh-projectile-homing))))
   0)
 
-(define *bh-next-ring* 0)
+(define bh-next-attack-time 0)
 (define *bh-spin* 0.0)
 (define *bh-center* (new 'global 'vector))
 
@@ -105,8 +114,40 @@
              (* (the float (- z half)) spacing))
           1.0)
 
-        (bh-spawn-bullet pos dir lifetime speed (the-as uint 16)))))
+        (bh-spawn-bullet pos dir lifetime speed (the-as uint 16) bh-projectile-homing))))
   0)
+
+(defun bh-sniper ((distance float) (height float) (lifetime float) (speed float) (homing float))
+  (when *target*
+    (let ((pos (new 'stack-no-clear 'vector))
+          (fwd (new 'stack-no-clear 'vector))
+          (dir (new 'stack-no-clear 'vector)))
+
+      ;; Camera forward direction in world space
+      (set! (-> fwd quad) (-> *math-camera* inv-camera-rot vector 2 quad))
+
+      ;; Flatten to the ground plane so camera pitch doesn't matter
+      (set! (-> fwd y) 0.0)
+      (vector-normalize! fwd 1.0)
+
+      ;; pos = Jak's position + camera forward * distance
+      (vector+*! pos (-> *target* control trans) fwd distance)
+
+      ;; Move upward in world space
+      (+! (-> pos y) height)
+
+      ;; Point toward Jak
+      (vector-! dir (-> *target* control trans) pos)
+      (vector-normalize! dir 1.0)
+
+      (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing)))
+  0)
+
+(define bh-pattern-unlock-amount 10)
+
+(defun bh-get-unlocked-patterns ()
+  (+ 2
+     (/ bh-power-cells bh-pattern-unlock-amount)))
 
 (defun bh-spawn-pattern ()
   (when *target*
@@ -118,51 +159,106 @@
       (-> *target* control trans)
       *bh-center*)
 
-    ;; Choose between currently unlocked patterns.
-    (let* ((pattern (rand-vu-int-count 2)))
-      (if (= pattern 0)
-        ;; Last parameter is always speed
-        ;; Ring
-        (bh-ring
-          *bh-center*
-          3               ;; Amount
-          *bh-spin*
-          (meters 15.0)    ;; Distance
-          2.0             ;; Lifetime
-          (meters 12.0))  ;; Speed
+    (set! bh-difficulty-scale (+ 1.0 bh-difficulty))
+    (set! bh-difficulty-scale-higher (+ 1.0 (* 1.25 bh-difficulty)))
+    (set! bh-difficulty-scale-half (+ 1.0 (* 0.5 bh-difficulty)))
+    (set! bh-projectile-homing (+ 0.01 (* 2.75 bh-difficulty)))
 
-        ;; Rain
-        (bh-rain
-          *bh-center*
-          4                 ;; Amount
-          (meters 7.0)      ;; Distance Spacing
-          (meters 14.0)     ;; Height
-          2.0               ;; Lifetime
-          (meters 11.0))))) ;; Speed
-  0)
+    ;; Choose between currently unlocked patterns.
+    ;; (let* ((patternCount (bh-get-unlocked-patterns)) (pattern (rand-vu-int-count patternCount)))
+    (defun projectile-update-velocity-space-wars ((arg0 projectile))
+  (cond
+    ;; ---- mod bullets: steer toward Jak with a capped turn rate ----
+    ((and *target* (> (-> arg0 bh-homing) 0.0))
+     (let ((want  (new 'stack-no-clear 'vector))
+           (cur   (new 'stack-no-clear 'vector))
+           (speed (vector-length (-> arg0 root transv))))
+       ;; direction from bullet to Jak's chest
+       (set! (-> want quad) (-> *target* control trans quad))
+       (+! (-> want y) (meters 1.0))
+       (vector-! want want (-> arg0 root trans))
+       (vector-normalize! want 1.0)
+       ;; current direction
+       (vector-normalize-copy! cur (-> arg0 root transv) 1.0)
+       (let* ((dot (vector-dot cur want))
+              (dot-c (cond ((> dot 1.0) 1.0) ((< dot -1.0) -1.0) (else dot)))
+              ;; angle between current heading and Jak, in game rotation units
+              (angle (acos dot-c))
+              ;; max turn this frame: homing * 1.8 deg/sec, scaled by frame time
+              (max-turn (* (degrees (* (-> arg0 bh-homing) 1.8)) (seconds-per-frame))))
+         (when (> angle 1.0)
+           ;; turn the fraction of the angle that fits under the cap
+           (vector-deg-slerp (-> arg0 root transv)
+                             cur
+                             want
+                             (fmin 1.0 (/ max-turn angle)))))
+       (vector-normalize! (-> arg0 root transv) speed)))
+
+    ;; ---- original behaviour (Jak's yellow gun etc.) ----
+    (else
+     (let ((s5-1 (vector-! (new 'stack-no-clear 'vector) (-> arg0 target) (-> arg0 root trans))))
+       (let ((s4-0 (new 'stack-no-clear 'vector))
+             (s3-0 (vector-normalize-copy! (new 'stack-no-clear 'vector) (-> arg0 root transv) 1.0))
+             (f30-0 (vector-length (-> arg0 root transv))))
+         (if (logtest? (-> arg0 root status) (cshape-moving-flags tsurf)) (vector-flatten! s5-1 s5-1 (-> arg0 root local-normal)))
+         (vector-normalize-copy! s4-0 s5-1 1.0)
+         (if (and (or (not (handle->process (-> arg0 last-target)))
+                      (zero? (-> (the-as target (handle->process (-> arg0 last-target))) control root-prim prim-core collide-as)))
+                  (< (vector-dot s4-0 s3-0) 0.0))
+           (go (method-of-object arg0 projectile-dissipate)))
+         (vector-deg-slerp (-> arg0 root transv) s3-0 s4-0 (-> arg0 tween))
+         (vector-normalize! (-> arg0 root transv) f30-0))
+       (vector+! (-> arg0 root transv) (-> arg0 root transv) s5-1))
+     ;; only Jak's gun gets gravity and the speed clamp
+     (vector-v++! (-> arg0 root transv) (compute-acc-due-to-gravity (-> arg0 root) (new-stack-vector0) 0.0))
+     (if (< (-> arg0 max-speed) (vector-length (-> arg0 root transv)))
+       (vector-normalize! (-> arg0 root transv) (-> arg0 max-speed)))
+     (if (logtest? (-> arg0 options) 1) (set! (-> arg0 root transv y) -40960.0))))
+  0
+  (none))
 
 (defun bh-update-difficulty ()
   (set! bh-power-cells (the int (-> *game-info* fuel)))
-  ;; 0.0 at 0 cells, 1.0 at 101 cells
-  (set! bh-difficulty
-        (fmax 0.0 (fmin 1.0 (/ (the float bh-power-cells) 101.0))))
+
+  (set! bh-difficulty-target
+        (fmax 0.0
+          (fmin 1.0
+            (/ (the float bh-power-cells) bh-difficulty-peak))))
+
+  (when (< (current-time) bh-difficulty-time)
+    (let ((t
+             (/ (the float (- (current-time)
+                              (- bh-difficulty-time (seconds 15.0))))
+                15.0)))
+      (set! bh-difficulty
+            (+ bh-difficulty-start
+               (* (- bh-difficulty-target bh-difficulty-start) t)))))
   0)
 
 (defun bullet-hell-update ()
+  (when (not (movie?))
+    (bh-update-difficulty)
 
-  (bh-update-difficulty)
+    (when *target*
 
-  (when *target*
+      (when (>= (current-time) bh-next-attack-time)
 
-    (when (>= (current-time) *bh-next-ring*)
+        (bh-spawn-pattern)
 
-      (bh-spawn-pattern)
+        (+! *bh-spin* 2000.0)
 
-      (+! *bh-spin* 2000.0)
-
-      (set! *bh-next-ring*
-            (+ (current-time) (seconds 1.5)))))
-
+        (set! bh-next-attack-time
+          (+ (current-time)
+            (seconds
+              (fmax 1.0
+                (/ 3.0 bh-difficulty-scale)
+                )
+              )
+            )
+          )
+        )
+      )
+    )
   0)
 
 ;; set one init-spec's value (and clear its random range)
@@ -211,12 +307,26 @@
 
   (when (cpad-pressed? 0 l1)
     (set! (-> *game-info* fuel) (fmax 0.0 (- (-> *game-info* fuel) 1.0)))
-    (bh-update-difficulty)
+    (set! bh-difficulty
+          (fmax 0.0 (- bh-difficulty (/ 1.0 bh-difficulty-peak))))
     (bh-debug-difficulty))
 
   (when (cpad-pressed? 0 r1)
     (set! (-> *game-info* fuel) (+ (-> *game-info* fuel) 1.0))
-    (bh-update-difficulty)
+    (set! bh-difficulty
+          (fmin 1.0 (+ bh-difficulty (/ 1.0 bh-difficulty-peak))))
+    (bh-debug-difficulty))
+
+  (when (cpad-pressed? 0 l2)
+    (set! (-> *game-info* fuel) (fmax 0.0 (- (-> *game-info* fuel) 100.0)))
+    (set! bh-difficulty
+          (fmax 0.0 (- bh-difficulty (/ 100.0 bh-difficulty-peak))))
+    (bh-debug-difficulty))
+
+  (when (cpad-pressed? 0 r2)
+    (set! (-> *game-info* fuel) (+ (-> *game-info* fuel) 100.0))
+    (set! bh-difficulty
+          (fmin 1.0 (+ bh-difficulty (/ 100.0 bh-difficulty-peak))))
     (bh-debug-difficulty))
 
   (bullet-hell-update)
@@ -242,7 +352,7 @@
 (defun runs-on-cell-pickup ((cell-event symbol))
   (case cell-event
     (('pickup)
-     ;; Code here runs as soon as you pickup a powercell
+      (+! bh-difficulty (/ 1.0 bh-difficulty-peak))
      )
     (('cutscene-end)
      ;; Code here runs at the end of any powercell cutscene
@@ -277,6 +387,13 @@
   ;; Code here runs every time jak spawns (loading a file new game or death)
   ;;uncomment this to use custom music for custom levels - the function is in mod-common-functions.gc
   ;;(process-spawn-function process music-manager-proc)
+  (set! bh-difficulty-start 0.0)
+  (set! bh-difficulty 0.0)
+  (set! bh-difficulty-time 0.0)
+  (set! bh-difficulty-target
+        (fmax 0.0
+          (fmin 1.0
+            (/ (the float (-> *game-info* fuel)) bh-difficulty-peak))))
   (none))
 
 (defun runs-on-jak-death ((death-event symbol))

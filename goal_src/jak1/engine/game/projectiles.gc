@@ -575,23 +575,46 @@
       (go-virtual projectile-dissipate)))
 
 (defun projectile-update-velocity-space-wars ((arg0 projectile))
-  (let ((s5-1 (vector-! (new 'stack-no-clear 'vector) (-> arg0 target) (-> arg0 root trans))))
-    (let ((s4-0 (new 'stack-no-clear 'vector))
-          (s3-0 (vector-normalize-copy! (new 'stack-no-clear 'vector) (-> arg0 root transv) 1.0))
-          (f30-0 (vector-length (-> arg0 root transv))))
-      (if (logtest? (-> arg0 root status) (cshape-moving-flags tsurf)) (vector-flatten! s5-1 s5-1 (-> arg0 root local-normal)))
-      (vector-normalize-copy! s4-0 s5-1 1.0)
-      (if (and (or (not (handle->process (-> arg0 last-target)))
-                   (zero? (-> (the-as target (handle->process (-> arg0 last-target))) control root-prim prim-core collide-as)))
-               (< (vector-dot s4-0 s3-0) 0.0))
-        (go (method-of-object arg0 projectile-dissipate)))
-      (vector-deg-slerp (-> arg0 root transv) s3-0 s4-0 (-> arg0 tween))
-      (vector-normalize! (-> arg0 root transv) f30-0))
-    (vector+! (-> arg0 root transv) (-> arg0 root transv) s5-1))
-  (vector-v++! (-> arg0 root transv) (compute-acc-due-to-gravity (-> arg0 root) (new-stack-vector0) 0.0))
-  (if (< (-> arg0 max-speed) (vector-length (-> arg0 root transv)))
-    (vector-normalize! (-> arg0 root transv) (-> arg0 max-speed)))
-  (if (logtest? (-> arg0 options) 1) (set! (-> arg0 root transv y) -40960.0))
+  (cond
+    ;; ---- mod bullets: steer toward Jak ----
+    ((and *target* (> (-> arg0 bh-homing) 0.0))
+     (let ((want  (new 'stack-no-clear 'vector))
+           (cur   (new 'stack-no-clear 'vector))
+           (speed (vector-length (-> arg0 root transv))))
+       ;; direction from bullet to Jak's chest
+       (set! (-> want quad) (-> *target* control trans quad))
+       (+! (-> want y) (meters 1.0))
+       (vector-! want want (-> arg0 root trans))
+       (vector-normalize! want 1.0)
+       ;; current direction
+       (vector-normalize-copy! cur (-> arg0 root transv) 1.0)
+       ;; turn toward Jak, keep speed
+       (vector-deg-slerp (-> arg0 root transv)
+                         cur
+                         want
+                         (fmin 1.0 (/ (-> arg0 bh-homing) 100.0)))
+       (vector-normalize! (-> arg0 root transv) speed)))
+
+    ;; ---- original behaviour (Jak's yellow gun etc.) ----
+    (else
+     (let ((s5-1 (vector-! (new 'stack-no-clear 'vector) (-> arg0 target) (-> arg0 root trans))))
+       (let ((s4-0 (new 'stack-no-clear 'vector))
+             (s3-0 (vector-normalize-copy! (new 'stack-no-clear 'vector) (-> arg0 root transv) 1.0))
+             (f30-0 (vector-length (-> arg0 root transv))))
+         (if (logtest? (-> arg0 root status) (cshape-moving-flags tsurf)) (vector-flatten! s5-1 s5-1 (-> arg0 root local-normal)))
+         (vector-normalize-copy! s4-0 s5-1 1.0)
+         (if (and (or (not (handle->process (-> arg0 last-target)))
+                      (zero? (-> (the-as target (handle->process (-> arg0 last-target))) control root-prim prim-core collide-as)))
+                  (< (vector-dot s4-0 s3-0) 0.0))
+           (go (method-of-object arg0 projectile-dissipate)))
+         (vector-deg-slerp (-> arg0 root transv) s3-0 s4-0 (-> arg0 tween))
+         (vector-normalize! (-> arg0 root transv) f30-0))
+       (vector+! (-> arg0 root transv) (-> arg0 root transv) s5-1))
+     ;; moved inside the else: only Jak's gun gets gravity and the speed clamp
+     (vector-v++! (-> arg0 root transv) (compute-acc-due-to-gravity (-> arg0 root) (new-stack-vector0) 0.0))
+     (if (< (-> arg0 max-speed) (vector-length (-> arg0 root transv)))
+       (vector-normalize! (-> arg0 root transv) (-> arg0 max-speed)))
+     (if (logtest? (-> arg0 options) 1) (set! (-> arg0 root transv y) -40960.0))))
   0
   (none))
 

@@ -31,7 +31,8 @@
    (update-velocity (function projectile none))
    (counter         int32)
    (target-count    int32)
-   (sound-id        sound-id))
+   (sound-id        sound-id)
+   (bh-homing       float))
   (:state-methods
    projectile-die
    projectile-dissipate

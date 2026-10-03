@@ -117,7 +117,7 @@
              (* (the float (- z half)) spacing))
           1.0)
 
-        (bh-spawn-bullet pos dir lifetime speed (the-as uint 16) bh-projectile-homing))))
+        (bh-spawn-bullet pos dir lifetime speed (the-as uint 16) (* bh-projectile-homing 0.5)))))
   0)
 
 (defun bh-sniper ((distance float) (height float) (lifetime float) (speed float) (homing float))
@@ -149,8 +149,11 @@
 (define bh-pattern-unlock-amount 5)
 
 (defun bh-get-unlocked-patterns ()
-  (+ 2
+  (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
+
+(define bh-patterns-seen 0)
+(define bh-implemented-patterns 3)
 
 (defun bh-spawn-pattern ()
   (when *target*
@@ -168,11 +171,15 @@
     (set! bh-difficulty-scale-third (+ 1.0 (* 0.33 bh-difficulty)))
     (set! bh-difficulty-scale-quartre (+ 1.0 (* 0.25 bh-difficulty)))
     (set! bh-difficulty-scale-lesser (+ 1.0 (* 0.75 bh-difficulty)))
-    (set! bh-projectile-homing (+ 0.01 (* 90.0 bh-difficulty)))
+    (set! bh-projectile-homing (+ 0.01 (* 60.0 bh-difficulty)))
 
     ;; Choose between currently unlocked patterns.
-    ;; (let* ((patternCount (bh-get-unlocked-patterns)) (pattern (rand-vu-int-count patternCount)))
-    (let* ((patternCount (bh-get-unlocked-patterns)) (pattern 2))
+    (let* ((patternCount (min (bh-get-unlocked-patterns) bh-implemented-patterns))
+       (pattern (if (< bh-patterns-seen patternCount)
+                    bh-patterns-seen
+                    (rand-vu-int-count patternCount))))
+    (when (< bh-patterns-seen patternCount)
+      (+! bh-patterns-seen 1))
       (case pattern
         ((0)
           ;; Ring
@@ -190,7 +197,7 @@
           (bh-rain
             *bh-center*
             (the int (* 3.0 bh-difficulty-scale))     ;; Amount
-            (/ (meters 16.0) bh-difficulty-scale)     ;; Distance Spacing
+            (/ (meters 18.0) bh-difficulty-scale-half)     ;; Distance Spacing
             (meters 14.0)                             ;; Height
             (- 2.0 (* 0.65 bh-difficulty))            ;; Lifetime
             (* (meters 11.0) bh-difficulty-scale)     ;; Speed
@@ -202,7 +209,7 @@
             (/ (meters 12.0) bh-difficulty-scale-half)         ;; Height
             (- 2.6 (* 0.65 bh-difficulty))                   ;; Lifetime
             (* (meters 18.0) bh-difficulty-scale-third)         ;; Speed
-            (+ 80.0 bh-projectile-homing)  ;; Homing
+            (+ 90.0 bh-projectile-homing)  ;; Homing
             )
           )
         )))

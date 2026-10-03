@@ -34,6 +34,8 @@
 (define bh-difficulty-time 0.0)
 (define bh-difficulty-peak 80.0)
 (define bh-projectile-homing 0.0)
+(define *bh-handles* (new 'global 'boxed-array uint64 512))
+(define *bh-handle-idx* 0)
 
 ;; spawn one bullet that can hurt Jak
 (defun bh-spawn-bullet ((pos vector) (dir vector) (lifetime float) (speed float) (options uint) (homing float) (bulletSize float) (lowSpeedNoKill int))
@@ -69,8 +71,11 @@
       ;; (set! (-> (the-as projectile-yellow proc) max-turn) 0.0)
       (set! (-> (the-as projectile-yellow proc) bh-homing) homing)
       (set! (-> (the-as projectile-yellow proc) bh-nokill) lowSpeedNoKill)
-      (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target))))
-
+      (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target)))
+      
+      (set! (-> *bh-handles* *bh-handle-idx*) (the-as uint64 (process->handle proc)))
+      (set! *bh-handle-idx* (logand (+ *bh-handle-idx* 1) 511))
+    )
   0)
 
 (defun bh-ring ((center vector) (n int) (offset float) (radius float) (lifetime float) (speed float))
@@ -97,7 +102,7 @@
         (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) bh-projectile-homing 0.25 0))))
   0)
 
-(define bh-next-attack-time 0)
+(define bh-next-attack-time 1)
 (define *bh-spin* 0.0)
 (define *bh-center* (new 'global 'vector))
 
@@ -268,15 +273,102 @@
               (bh-spawn-bullet pos dir lifetime speed (the-as uint 16) homing 0.33 1)))))))
   0)
 
-(define bh-pattern-unlock-amount 5)
+;; ---- trail pattern state ----
+(define *bh-trail-active* #f)
+(define *bh-trail-end* 0)
+(define *bh-trail-next* 0)
+(define *bh-trail-rate* 0)
+(define *bh-trail-delay* 0)
+(define *bh-trail-lifetime* 0.0)
+(define *bh-trail-speed* 0.0)
+(define *bh-trail-homing* 0.0)
+(define *bh-trail-head* 0)
+(define *bh-trail-count* 0)
 
+;; queue of recorded spawns (max 32 pending), stored as separate floats
+(define *bh-trail-px* (new 'global 'boxed-array float 32))
+(define *bh-trail-py* (new 'global 'boxed-array float 32))
+(define *bh-trail-pz* (new 'global 'boxed-array float 32))
+(define *bh-trail-dx* (new 'global 'boxed-array float 32))
+(define *bh-trail-dy* (new 'global 'boxed-array float 32))
+(define *bh-trail-dz* (new 'global 'boxed-array float 32))
+(define *bh-trail-due* (new 'global 'boxed-array int32 32))
+(define *bh-trail-tmp-p* (new 'global 'vector))
+(define *bh-trail-tmp-d* (new 'global 'vector))
+
+(defun bh-trail-start ((duration float) (rate float) (delay float) (lifetime float) (speed float) (homing float))
+  (set! *bh-trail-active* #t)
+  (set! *bh-trail-next* (current-time))
+  (set! *bh-trail-end* (the-as int (+ (current-time) (the int (fsec duration)))))
+  (set! *bh-trail-rate* (the int (fsec rate)))
+  (set! *bh-trail-delay* (the int (fsec delay)))
+  (set! *bh-trail-lifetime* lifetime)
+  (set! *bh-trail-speed* speed)
+  (set! *bh-trail-homing* homing)
+  (set! *bh-trail-head* 0)
+  (set! *bh-trail-count* 0)
+  0)
+
+(defun bh-trail-update ()
+  (when (and *target* *bh-trail-active*)
+    ;; 1. spawn queued bullets whose delay has passed
+    (while (and (> *bh-trail-count* 0)
+                (>= (current-time) (-> *bh-trail-due* *bh-trail-head*)))
+      (set-vector! *bh-trail-tmp-p*
+                   (-> *bh-trail-px* *bh-trail-head*)
+                   (-> *bh-trail-py* *bh-trail-head*)
+                   (-> *bh-trail-pz* *bh-trail-head*)
+                   1.0)
+      (set-vector! *bh-trail-tmp-d*
+                   (-> *bh-trail-dx* *bh-trail-head*)
+                   (-> *bh-trail-dy* *bh-trail-head*)
+                   (-> *bh-trail-dz* *bh-trail-head*)
+                   1.0)
+      (bh-spawn-bullet *bh-trail-tmp-p*
+                       *bh-trail-tmp-d*
+                       *bh-trail-lifetime*
+                       *bh-trail-speed*
+                       (the-as uint 16)
+                       *bh-trail-homing*
+                       0.5
+                       1)
+      (set! *bh-trail-head* (logand (+ *bh-trail-head* 1) 31))
+      (+! *bh-trail-count* -1))
+
+    ;; 2. record a new spawn on each tick while the duration lasts
+    (when (and (< (current-time) *bh-trail-end*)
+               (>= (current-time) *bh-trail-next*)
+               (< *bh-trail-count* 32))
+      (let ((idx (logand (+ *bh-trail-head* *bh-trail-count*) 31))
+            (d (new 'stack-no-clear 'vector)))
+        ;; position: Jak's chest right now
+        (set! (-> *bh-trail-px* idx) (-> *target* control trans x))
+        (set! (-> *bh-trail-py* idx) (+ (-> *target* control trans y) (meters 1.0)))
+        (set! (-> *bh-trail-pz* idx) (-> *target* control trans z))
+        ;; direction: Jak's horizontal movement, or facing if standing still
+        (set! (-> d quad) (-> *target* control transv quad))
+        (set! (-> d y) 0.0)
+        (if (< (vector-length d) (meters 0.5))
+          (vector-z-quaternion! d (-> *target* control quat)))
+        (vector-normalize! d 1.0)
+        (set! (-> *bh-trail-dx* idx) (-> d x))
+        (set! (-> *bh-trail-dy* idx) 0.0)
+        (set! (-> *bh-trail-dz* idx) (-> d z))
+        (set! (-> *bh-trail-due* idx) (+ (current-time) *bh-trail-delay*))
+        (+! *bh-trail-count* 1)
+        (set! *bh-trail-next* (+ (current-time) *bh-trail-rate*))))
+
+    ;; 3. finished once time is up and the queue is empty
+    (when (and (>= (current-time) *bh-trail-end*) (zero? *bh-trail-count*))
+      (set! *bh-trail-active* #f)))
+  0)
+
+(define bh-pattern-unlock-amount 5)
 (defun bh-get-unlocked-patterns ()
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
-
 (define bh-patterns-seen 0)
 (define bh-implemented-patterns 3)
-
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -299,7 +391,7 @@
     (let* ((patternCount (min (bh-get-unlocked-patterns) bh-implemented-patterns))
        (pattern (if (< bh-patterns-seen patternCount)
                     bh-patterns-seen
-                    5 ;; (rand-vu-int-count patternCount)
+                    6 ;; (rand-vu-int-count patternCount)
                   )))
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
@@ -327,10 +419,10 @@
         )
         ((2)
           (bh-sniper
-            (/ (meters 25.0) bh-difficulty-scale-third)     ;; Distance
+            (/ (meters 25.0) bh-difficulty-scale-quartre)     ;; Distance
             (/ (meters 12.0) bh-difficulty-scale-half)      ;; Height
             (- 2.6 (* 0.65 bh-difficulty))                  ;; Lifetime
-            (* (meters 18.0) bh-difficulty-scale-third)     ;; Speed
+            (* (meters 17.0) bh-difficulty-scale-third)     ;; Speed
             (+ 90.0 bh-projectile-homing)                   ;; Homing
             )
           )
@@ -366,33 +458,79 @@
             (+ 10.0 (* bh-projectile-homing 0.33))           ;; Homing
             )
         )
+        ((6)
+          (bh-trail-start
+            (- 1.5 (* 0.25 bh-difficulty))                    ;; Duration
+            (/ 0.4 bh-difficulty-scale-half)                  ;; Rate
+            (/ 0.7 bh-difficulty-scale-half)               ;; Delay
+            (- 1.25 (* 0.25 bh-difficulty))                   ;; Lifetime
+            (* (meters 4.4) bh-difficulty-scale-lesser)              ;; Speed
+            (+ 20.0 (* bh-projectile-homing))                 ;; Homing
+            )
+        )
         )))
   0)
 
+(defun bh-debug-difficulty ()
+  (format #t "BH Power Cells: ~d  Difficulty: ~f" bh-power-cells bh-difficulty)
+  0)
+
+(define bh-difficulty-reset-duration 10.0)
 (defun bh-update-difficulty ()
+
   (set! bh-power-cells (the int (-> *game-info* fuel)))
 
   (set! bh-difficulty-target
         (fmax 0.0
           (fmin 1.0
-            (/ (the float bh-power-cells) bh-difficulty-peak))))
+            (/ (the float bh-power-cells)
+               bh-difficulty-peak))))
 
   (when (< (current-time) bh-difficulty-time)
+
     (let ((t
-             (/ (the float (- (current-time)
-                              (- bh-difficulty-time (seconds 15.0))))
-                15.0)))
+             (- 1.0
+                (/ (the float (- bh-difficulty-time (current-time)))
+                   (the float (seconds bh-difficulty-reset-duration))))))
+
       (set! bh-difficulty
             (+ bh-difficulty-start
-               (* (- bh-difficulty-target bh-difficulty-start) t)))))
+               (* (- bh-difficulty-target bh-difficulty-start) t)))
+
+      ;;(bh-debug-difficulty)
+      ))
+
+  (when (>= (current-time) bh-difficulty-time)
+    (set! bh-difficulty bh-difficulty-target))
+
   0)
 
+(defun bh-clear-bullets ()
+  (dotimes (i 512)
+    (when (nonzero? (-> *bh-handles* i))
+      (let ((p (handle->process (the-as handle (-> *bh-handles* i)))))
+        (when p (deactivate p)))
+      (set! (-> *bh-handles* i) (the-as uint64 0))))
+  (set! *bh-trail-active* #f)
+  (set! *bh-trail-count* 0)
+  0)
+
+(define *bh-last-movie* #f)
+(define *bh-resume-time* 0)
 (defun bullet-hell-update ()
-  (when (not (movie?))
+  (let ((m (if (-> *setting-control* current movie) #t #f)))
+  (if (and m (not *bh-last-movie*))
+    (bh-clear-bullets))
+  (if (and (not m) *bh-last-movie*)
+    (set! *bh-resume-time* (+ (current-time) (seconds 2.0))))
+  (set! *bh-last-movie* m))
+
+  (when (and *target*
+             (not *bh-last-movie*)
+             (>= (current-time) *bh-resume-time*))
     (bh-update-difficulty)
-
-    (when *target*
-
+    (bh-trail-update)
+    (when (> bh-difficulty 0.0)
       (when (>= (current-time) bh-next-attack-time)
 
         (bh-spawn-pattern)
@@ -447,10 +585,6 @@
   (bh-set-spec 2059 8 -8.0) ;; Flash fade
   0)
 
-(defun bh-debug-difficulty ()
-  (format #t "BH Power Cells: ~d  Difficulty: ~f" bh-power-cells bh-difficulty)
-  0)
-
 (defun runs-every-frame ()
   (if *show-input-display* (input-display-on) (input-display-off))
 
@@ -461,25 +595,29 @@
     (set! (-> *game-info* fuel) (fmax 0.0 (- (-> *game-info* fuel) 1.0)))
     (set! bh-difficulty
           (fmax 0.0 (- bh-difficulty (/ 1.0 bh-difficulty-peak))))
-    (bh-debug-difficulty))
+    (bh-debug-difficulty)
+    (bh-clear-bullets))
 
   (when (cpad-pressed? 0 r1)
     (set! (-> *game-info* fuel) (+ (-> *game-info* fuel) 1.0))
     (set! bh-difficulty
           (fmin 1.0 (+ bh-difficulty (/ 1.0 bh-difficulty-peak))))
-    (bh-debug-difficulty))
+    (bh-debug-difficulty)
+    (bh-clear-bullets))
 
   (when (cpad-pressed? 0 l2)
     (set! (-> *game-info* fuel) (fmax 0.0 (- (-> *game-info* fuel) 100.0)))
     (set! bh-difficulty
           (fmax 0.0 (- bh-difficulty (/ 100.0 bh-difficulty-peak))))
-    (bh-debug-difficulty))
+    (bh-debug-difficulty)
+    (bh-clear-bullets))
 
   (when (cpad-pressed? 0 r2)
     (set! (-> *game-info* fuel) (+ (-> *game-info* fuel) 100.0))
     (set! bh-difficulty
           (fmin 1.0 (+ bh-difficulty (/ 100.0 bh-difficulty-peak))))
-    (bh-debug-difficulty))
+    (bh-debug-difficulty)
+    (bh-clear-bullets))
 
   (bullet-hell-update)
   (bh-tint-particles)
@@ -505,6 +643,7 @@
   (case cell-event
     (('pickup)
       (+! bh-difficulty (/ 1.0 bh-difficulty-peak))
+      (bh-clear-bullets)
      )
     (('cutscene-end)
      ;; Code here runs at the end of any powercell cutscene
@@ -529,6 +668,7 @@
        )
       (((pickup-type eco-green))
        ;; Code here runs as soon as you pickup big green eco 
+        (bh-clear-bullets)
        ))
     (when from-vent?
       ;; Code here runs only if the eco was picked up from a vent
@@ -536,16 +676,23 @@
   (none))
 
 (defun runs-on-jak-spawn ()
-  ;; Code here runs every time jak spawns (loading a file new game or death)
-  ;;uncomment this to use custom music for custom levels - the function is in mod-common-functions.gc
-  ;;(process-spawn-function process music-manager-proc)
   (set! bh-difficulty-start 0.0)
   (set! bh-difficulty 0.0)
-  (set! bh-difficulty-time 0.0)
+  (set! bh-next-attack-time
+          (+ (current-time)
+            (seconds 2.0)
+          )
+        )
   (set! bh-difficulty-target
         (fmax 0.0
           (fmin 1.0
-            (/ (the float (-> *game-info* fuel)) bh-difficulty-peak))))
+            (/ (the float (-> *game-info* fuel))
+               bh-difficulty-peak))))
+
+  (set! bh-difficulty-time
+        (the float (+ (current-time)
+           (seconds bh-difficulty-reset-duration))))
+
   (none))
 
 (defun runs-on-jak-death ((death-event symbol))

@@ -576,11 +576,17 @@
 
 (defun projectile-update-velocity-space-wars ((arg0 projectile))
   (cond
-    ;; ---- mod bullets: steer toward Jak ----
+    ;; ---- mod bullets: steer toward Jak with a capped turn rate ----
     ((and *target* (> (-> arg0 bh-homing) 0.0))
      (let ((want  (new 'stack-no-clear 'vector))
            (cur   (new 'stack-no-clear 'vector))
-           (speed (vector-length (-> arg0 root transv))))
+           (speed (vector-length (-> arg0 root transv)))
+           ;; pull strength per frame; homing 100 = about 2 rad/s (~115 deg/s)
+           (k     (fmin 0.95
+             (* (/ (-> arg0 bh-homing) 100.0)
+                2.0  ;; turn rate in rad/s at homing 100
+                (seconds-per-frame))))
+              )
        ;; direction from bullet to Jak's chest
        (set! (-> want quad) (-> *target* control trans quad))
        (+! (-> want y) (meters 1.0))
@@ -588,11 +594,8 @@
        (vector-normalize! want 1.0)
        ;; current direction
        (vector-normalize-copy! cur (-> arg0 root transv) 1.0)
-       ;; turn toward Jak, keep speed
-       (vector-deg-slerp (-> arg0 root transv)
-                         cur
-                         want
-                         (fmin 1.0 (/ (-> arg0 bh-homing) 100.0)))
+       ;; heading = cur + want * k, then restore speed
+       (vector+*! (-> arg0 root transv) cur want k)
        (vector-normalize! (-> arg0 root transv) speed)))
 
     ;; ---- original behaviour (Jak's yellow gun etc.) ----
@@ -610,7 +613,7 @@
          (vector-deg-slerp (-> arg0 root transv) s3-0 s4-0 (-> arg0 tween))
          (vector-normalize! (-> arg0 root transv) f30-0))
        (vector+! (-> arg0 root transv) (-> arg0 root transv) s5-1))
-     ;; moved inside the else: only Jak's gun gets gravity and the speed clamp
+     ;; only Jak's gun gets gravity and the speed clamp
      (vector-v++! (-> arg0 root transv) (compute-acc-due-to-gravity (-> arg0 root) (new-stack-vector0) 0.0))
      (if (< (-> arg0 max-speed) (vector-length (-> arg0 root transv)))
        (vector-normalize! (-> arg0 root transv) (-> arg0 max-speed)))

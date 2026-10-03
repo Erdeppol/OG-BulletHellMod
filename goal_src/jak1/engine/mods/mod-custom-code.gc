@@ -26,6 +26,9 @@
 (define bh-difficulty-scale 1.0)
 (define bh-difficulty-scale-higher 1.0)
 (define bh-difficulty-scale-half 1.0)
+(define bh-difficulty-scale-third 1.0)
+(define bh-difficulty-scale-quartre 1.0)
+(define bh-difficulty-scale-lesser 1.0)
 (define bh-difficulty-start 0.0)
 (define bh-difficulty-target 0.0)
 (define bh-difficulty-time 0.0)
@@ -143,7 +146,7 @@
       (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing)))
   0)
 
-(define bh-pattern-unlock-amount 10)
+(define bh-pattern-unlock-amount 5)
 
 (defun bh-get-unlocked-patterns ()
   (+ 2
@@ -162,60 +165,48 @@
     (set! bh-difficulty-scale (+ 1.0 bh-difficulty))
     (set! bh-difficulty-scale-higher (+ 1.0 (* 1.25 bh-difficulty)))
     (set! bh-difficulty-scale-half (+ 1.0 (* 0.5 bh-difficulty)))
-    (set! bh-projectile-homing (+ 0.01 (* 2.75 bh-difficulty)))
+    (set! bh-difficulty-scale-third (+ 1.0 (* 0.33 bh-difficulty)))
+    (set! bh-difficulty-scale-quartre (+ 1.0 (* 0.25 bh-difficulty)))
+    (set! bh-difficulty-scale-lesser (+ 1.0 (* 0.75 bh-difficulty)))
+    (set! bh-projectile-homing (+ 0.01 (* 90.0 bh-difficulty)))
 
     ;; Choose between currently unlocked patterns.
     ;; (let* ((patternCount (bh-get-unlocked-patterns)) (pattern (rand-vu-int-count patternCount)))
-    (defun projectile-update-velocity-space-wars ((arg0 projectile))
-  (cond
-    ;; ---- mod bullets: steer toward Jak with a capped turn rate ----
-    ((and *target* (> (-> arg0 bh-homing) 0.0))
-     (let ((want  (new 'stack-no-clear 'vector))
-           (cur   (new 'stack-no-clear 'vector))
-           (speed (vector-length (-> arg0 root transv))))
-       ;; direction from bullet to Jak's chest
-       (set! (-> want quad) (-> *target* control trans quad))
-       (+! (-> want y) (meters 1.0))
-       (vector-! want want (-> arg0 root trans))
-       (vector-normalize! want 1.0)
-       ;; current direction
-       (vector-normalize-copy! cur (-> arg0 root transv) 1.0)
-       (let* ((dot (vector-dot cur want))
-              (dot-c (cond ((> dot 1.0) 1.0) ((< dot -1.0) -1.0) (else dot)))
-              ;; angle between current heading and Jak, in game rotation units
-              (angle (acos dot-c))
-              ;; max turn this frame: homing * 1.8 deg/sec, scaled by frame time
-              (max-turn (* (degrees (* (-> arg0 bh-homing) 1.8)) (seconds-per-frame))))
-         (when (> angle 1.0)
-           ;; turn the fraction of the angle that fits under the cap
-           (vector-deg-slerp (-> arg0 root transv)
-                             cur
-                             want
-                             (fmin 1.0 (/ max-turn angle)))))
-       (vector-normalize! (-> arg0 root transv) speed)))
-
-    ;; ---- original behaviour (Jak's yellow gun etc.) ----
-    (else
-     (let ((s5-1 (vector-! (new 'stack-no-clear 'vector) (-> arg0 target) (-> arg0 root trans))))
-       (let ((s4-0 (new 'stack-no-clear 'vector))
-             (s3-0 (vector-normalize-copy! (new 'stack-no-clear 'vector) (-> arg0 root transv) 1.0))
-             (f30-0 (vector-length (-> arg0 root transv))))
-         (if (logtest? (-> arg0 root status) (cshape-moving-flags tsurf)) (vector-flatten! s5-1 s5-1 (-> arg0 root local-normal)))
-         (vector-normalize-copy! s4-0 s5-1 1.0)
-         (if (and (or (not (handle->process (-> arg0 last-target)))
-                      (zero? (-> (the-as target (handle->process (-> arg0 last-target))) control root-prim prim-core collide-as)))
-                  (< (vector-dot s4-0 s3-0) 0.0))
-           (go (method-of-object arg0 projectile-dissipate)))
-         (vector-deg-slerp (-> arg0 root transv) s3-0 s4-0 (-> arg0 tween))
-         (vector-normalize! (-> arg0 root transv) f30-0))
-       (vector+! (-> arg0 root transv) (-> arg0 root transv) s5-1))
-     ;; only Jak's gun gets gravity and the speed clamp
-     (vector-v++! (-> arg0 root transv) (compute-acc-due-to-gravity (-> arg0 root) (new-stack-vector0) 0.0))
-     (if (< (-> arg0 max-speed) (vector-length (-> arg0 root transv)))
-       (vector-normalize! (-> arg0 root transv) (-> arg0 max-speed)))
-     (if (logtest? (-> arg0 options) 1) (set! (-> arg0 root transv y) -40960.0))))
-  0
-  (none))
+    (let* ((patternCount (bh-get-unlocked-patterns)) (pattern 2))
+      (case pattern
+        ((0)
+          ;; Ring
+          (bh-ring
+            *bh-center*
+            (the int (* 3.0 bh-difficulty-scale))       ;; Amount
+            *bh-spin*
+            (/ (meters 18.0) bh-difficulty-scale-half)  ;; Distance
+            (- 2.0 (* 0.65 bh-difficulty))                 ;; Lifetime
+            (* (meters 10.0) bh-difficulty-scale)       ;; Speed
+          )
+        )
+        ((1)
+          ;; Rain
+          (bh-rain
+            *bh-center*
+            (the int (* 3.0 bh-difficulty-scale))     ;; Amount
+            (/ (meters 16.0) bh-difficulty-scale)     ;; Distance Spacing
+            (meters 14.0)                             ;; Height
+            (- 2.0 (* 0.65 bh-difficulty))            ;; Lifetime
+            (* (meters 11.0) bh-difficulty-scale)     ;; Speed
+            )
+        )
+        ((2)
+          (bh-sniper
+            (/ (meters 25.0) bh-difficulty-scale-third)         ;; Distance
+            (/ (meters 12.0) bh-difficulty-scale-half)         ;; Height
+            (- 2.6 (* 0.65 bh-difficulty))                   ;; Lifetime
+            (* (meters 18.0) bh-difficulty-scale-third)         ;; Speed
+            (+ 80.0 bh-projectile-homing)  ;; Homing
+            )
+          )
+        )))
+  0)
 
 (defun bh-update-difficulty ()
   (set! bh-power-cells (the int (-> *game-info* fuel)))

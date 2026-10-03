@@ -36,7 +36,7 @@
 (define bh-projectile-homing 0.0)
 
 ;; spawn one bullet that can hurt Jak
-(defun bh-spawn-bullet ((pos vector) (dir vector) (lifetime float) (speed float) (options uint) (homing float))
+(defun bh-spawn-bullet ((pos vector) (dir vector) (lifetime float) (speed float) (options uint) (homing float) (bulletSize float) (lowSpeedNoKill int))
 
   (let ((vel (new 'stack-no-clear 'vector))
 
@@ -63,11 +63,12 @@
               (-> (the-as projectile-yellow proc)
                   root root-prim local-sphere))
             r)
-          0.25))
+          bulletSize))
 
       (set! (-> (the-as projectile-yellow proc) attack-mode) 'damage)
       ;; (set! (-> (the-as projectile-yellow proc) max-turn) 0.0)
       (set! (-> (the-as projectile-yellow proc) bh-homing) homing)
+      (set! (-> (the-as projectile-yellow proc) bh-nokill) lowSpeedNoKill)
       (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target))))
 
   0)
@@ -93,7 +94,7 @@
           0.0
           (- (cos ang))
           1.0)
-        (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) bh-projectile-homing))))
+        (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) bh-projectile-homing 0.25 0))))
   0)
 
 (define bh-next-attack-time 0)
@@ -117,7 +118,7 @@
              (* (the float (- z half)) spacing))
           1.0)
 
-        (bh-spawn-bullet pos dir lifetime speed (the-as uint 16) (* bh-projectile-homing 0.5)))))
+        (bh-spawn-bullet pos dir lifetime speed (the-as uint 16) (* bh-projectile-homing 0.5) 0.23 0))))
   0)
 
 (defun bh-sniper ((distance float) (height float) (lifetime float) (speed float) (homing float))
@@ -143,7 +144,128 @@
       (vector-! dir (-> *target* control trans) pos)
       (vector-normalize! dir 1.0)
 
-      (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing)))
+      (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 0)))
+  0)
+
+(defun bh-side-pair ((distance float) (height float) (sideDistance float) (lifetime float) (speed float) (homing float))
+  (when *target*
+    (let ((pos (new 'stack-no-clear 'vector))
+            (fwd (new 'stack-no-clear 'vector))
+            (right (new 'stack-no-clear 'vector))
+            (dir (new 'stack-no-clear 'vector)))
+
+      ;; Camera forward direction in world space.
+      (set! (-> fwd quad) (-> *math-camera* inv-camera-rot vector 2 quad))
+
+      ;; Flatten to the ground plane so camera pitch doesn't matter.
+      (set! (-> fwd y) 0.0)
+      (vector-normalize! fwd 1.0)
+
+      ;; Camera right direction.
+      (set-vector!
+        right
+        (-> fwd z)
+        0.0
+        (- (-> fwd x))
+        0.0)
+
+      (vector-normalize! right 1.0)
+
+      ;; Center position = Jak + camera forward * distance.
+      (vector+*! pos (-> *target* control trans) fwd distance)
+
+      ;; Move upward in world space.
+      (+! (-> pos y) height)
+
+      ;; Right bullet.
+      (vector+*! pos pos right sideDistance)
+
+      ;; Point toward Jak.
+      (vector-! dir (-> *target* control trans) pos)
+      (vector-normalize! dir 1.0)
+
+      (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 0)
+
+      ;; Recalculate center position.
+      (vector+*! pos (-> *target* control trans) fwd distance)
+      (+! (-> pos y) height)
+
+      ;; Left bullet.
+      (vector+*! pos pos right (- sideDistance))
+
+      ;; Point toward Jak.
+      (vector-! dir (-> *target* control trans) pos)
+      (vector-normalize! dir 1.0)
+
+      (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 0)))
+  0)
+
+(defun bh-ground ((center vector) (gridSize int) (safeSpace float) (spacing float) (height float) (lifetime float) (speed float) (homing float))
+  (let* ((pos (new 'stack-no-clear 'vector))
+         (dir (new 'stack-no-clear 'vector))
+         (half (/ (- gridSize 1) 2)))
+
+    (dotimes (x gridSize)
+      (dotimes (z gridSize)
+
+        (let* ((offsetX (* (the float (- x half)) spacing))
+               (offsetZ (* (the float (- z half)) spacing)))
+
+          (when (>= (+ (* offsetX offsetX)
+                         (* offsetZ offsetZ))
+                      (* safeSpace safeSpace))
+
+            (set-vector!
+              pos
+              (+ (-> center x) offsetX)
+              (+ (-> center y) height)
+              (+ (-> center z) offsetZ)
+              1.0)
+
+            ;; Point from the bullet toward Jak.
+            (vector-! dir (-> *target* control trans) pos)
+            (vector-normalize! dir 1.0)
+
+            (bh-spawn-bullet
+              pos
+              dir
+              lifetime
+              speed
+              (the-as uint 16)
+              homing
+              0.5
+              1))))))
+
+  0)
+
+(defun bh-box ((center vector) (gridSize int) (distance float) (lifetime float) (speed float) (homing float))
+  (let* ((pos (new 'stack-no-clear 'vector))
+         (dir (new 'stack-no-clear 'vector))
+         (last (- gridSize 1))
+         (spacing (/ (* 2.0 distance) (the float (if (< last 1) 1 last)))))
+
+    (dotimes (ix gridSize)
+      (dotimes (iy gridSize)
+        (dotimes (iz gridSize)
+
+          ;; only the outer shell, skip the interior
+          (when (or (= ix 0) (= ix last) (= iy 0) (= iy last) (= iz 0) (= iz last))
+            (let* ((offsetX (- (* (the float ix) spacing) distance))
+                   (offsetY (- (* (the float iy) spacing) distance))
+                   (offsetZ (- (* (the float iz) spacing) distance)))
+
+              (set-vector!
+                pos
+                (+ (-> center x) offsetX)
+                (+ (-> center y) offsetY)
+                (+ (-> center z) offsetZ)
+                1.0)
+
+              ;; Point toward from the center.
+              (set-vector! dir (- offsetX) (- offsetY) (- offsetZ) 1.0)
+              (vector-normalize! dir 1.0)
+
+              (bh-spawn-bullet pos dir lifetime speed (the-as uint 16) homing 0.33 1)))))))
   0)
 
 (define bh-pattern-unlock-amount 5)
@@ -177,7 +299,8 @@
     (let* ((patternCount (min (bh-get-unlocked-patterns) bh-implemented-patterns))
        (pattern (if (< bh-patterns-seen patternCount)
                     bh-patterns-seen
-                    (rand-vu-int-count patternCount))))
+                    5 ;; (rand-vu-int-count patternCount)
+                  )))
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -193,25 +316,56 @@
           )
         )
         ((1)
-          ;; Rain
           (bh-rain
             *bh-center*
-            (the int (* 3.0 bh-difficulty-scale))     ;; Amount
-            (/ (meters 18.0) bh-difficulty-scale-half)     ;; Distance Spacing
-            (meters 14.0)                             ;; Height
-            (- 2.0 (* 0.65 bh-difficulty))            ;; Lifetime
-            (* (meters 11.0) bh-difficulty-scale)     ;; Speed
+            (the int (* 3.0 bh-difficulty-scale))       ;; Amount
+            (/ (meters 18.0) bh-difficulty-scale-half)  ;; Distance Spacing
+            (meters 14.0)                               ;; Height
+            (- 2.0 (* 0.66 bh-difficulty))              ;; Lifetime
+            (* (meters 10.6) bh-difficulty-scale-half)       ;; Speed
             )
         )
         ((2)
           (bh-sniper
-            (/ (meters 25.0) bh-difficulty-scale-third)         ;; Distance
-            (/ (meters 12.0) bh-difficulty-scale-half)         ;; Height
-            (- 2.6 (* 0.65 bh-difficulty))                   ;; Lifetime
-            (* (meters 18.0) bh-difficulty-scale-third)         ;; Speed
-            (+ 90.0 bh-projectile-homing)  ;; Homing
+            (/ (meters 25.0) bh-difficulty-scale-third)     ;; Distance
+            (/ (meters 12.0) bh-difficulty-scale-half)      ;; Height
+            (- 2.6 (* 0.65 bh-difficulty))                  ;; Lifetime
+            (* (meters 18.0) bh-difficulty-scale-third)     ;; Speed
+            (+ 90.0 bh-projectile-homing)                   ;; Homing
             )
           )
+        ((3)
+          (bh-side-pair
+            (/ (meters 23.0) bh-difficulty-scale-third)     ;; Distance
+            (/ (meters 8.0) bh-difficulty-scale-quartre)    ;; Height
+            (/ (meters 20.0) bh-difficulty-scale-third)     ;; Side distance
+            (- 2.7 (* 0.6 bh-difficulty))                  ;; Lifetime
+            (* (meters 15.0) bh-difficulty-scale-third)     ;; Speed
+            (+ 80.0 bh-projectile-homing)                   ;; Homing
+            )
+          )
+        ((4)
+          (bh-ground
+            *bh-center*
+            (the int (* 6.0 bh-difficulty-scale-half))       ;; Amount
+            (/ (meters 4.0) bh-difficulty-scale-half)        ;; Safe space
+            (/ (meters 12.0) bh-difficulty-scale-half)       ;; Distance Spacing
+            (meters 2.0)                                     ;; Height
+            (- 2.0 (* 0.5 bh-difficulty))                    ;; Lifetime
+            (* (meters 3.0) bh-difficulty-scale-half)        ;; Speed
+            (+ 30.0 (* bh-projectile-homing 0.25))           ;; Homing
+            )
+        )
+        ((5)
+          (bh-box
+            *bh-center*
+            (the int (* 3.0 bh-difficulty-scale-third))      ;; Amount
+            (/ (meters 12.0) bh-difficulty-scale-quartre)    ;; Distance
+            (- 2.0 (* 0.5 bh-difficulty))                    ;; Lifetime
+            (* (meters 1.0) bh-difficulty-scale-half)        ;; Speed
+            (+ 10.0 (* bh-projectile-homing 0.33))           ;; Homing
+            )
+        )
         )))
   0)
 

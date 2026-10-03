@@ -32,7 +32,8 @@
    (counter         int32)
    (target-count    int32)
    (sound-id        sound-id)
-   (bh-homing       float))
+   (bh-homing       float)
+   (bh-nokill       int32))
   (:state-methods
    projectile-die
    projectile-dissipate

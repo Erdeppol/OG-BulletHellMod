@@ -659,12 +659,87 @@
             (set-vector! dir dx 0.0 dz 1.0)
             (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.5 1))))))
   0)
+
+;; columns = total columns across the wall, spacing = gap between columns
+;; rows / row-gap / height = vertical layout (height = lowest row above Jak's feet)
+;; group = solid columns in a row, gap = empty columns between groups
+(defun bh-wall ((columns int) (spacing float) (rows int) (row-gap float) (height float) (group int) (gap int) (speed float))
+  (when *target*
+    (let ((lifetime 3.0)
+          (distance (meters 20.0))
+          (fwd (new 'stack-no-clear 'vector))
+          (pos (new 'stack-no-clear 'vector))
+          (dir (new 'stack-no-clear 'vector)))
+      ;; camera forward, flattened (same as bh-sniper)
+      (set! (-> fwd quad) (-> *math-camera* inv-camera-rot vector 2 quad))
+      (set! (-> fwd y) 0.0)
+      (vector-normalize! fwd 1.0)
+      (let* ((fx (-> fwd x))
+             (fz (-> fwd z))
+             ;; camera right
+             (rx fz)
+             (rz (- fx))
+             (cx (+ (-> *target* control trans x) (* fx distance)))
+             (cz (+ (-> *target* control trans z) (* fz distance)))
+             (mid (/ (the float (- columns 1)) 2.0))
+             (period (+ group gap))
+             ;; random shift so the gaps land in a different place each time
+             (phase (rand-vu-int-range 0 (- period 1))))
+        ;; every bullet moves toward the camera
+        (set-vector! dir (- fx) 0.0 (- fz) 1.0)
+        (dotimes (c columns)
+          (let ((k (+ c phase)))
+            (when (< (- k (* (/ k period) period)) group)
+              (let ((along (* (- (the float c) mid) spacing)))
+                (dotimes (r rows)
+                  (set-vector! pos
+                               (+ cx (* rx along))
+                               (+ (-> *target* control trans y) height (* (the float r) row-gap))
+                               (+ cz (* rz along))
+                               1.0)
+                  (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) 0.0 0.4 0)))))))))
+    0)
+
+;; radius   = distance of the tornado wall from Jak
+;; layers   = number of stacked rings, layer-gap = height between rings
+;; amount   = bullets per ring
+;; twist    = extra rotation per layer, e.g. (degrees 20.0), which gives the helix
+;; inward   = 0 pure sideways, >0 drifts toward Jak
+;; spin     = 1.0 or -1.0 for rotation direction (0.0 = random)
+(defun bh-tornado ((radius float) (layers int) (amount int) (twist float) (inward float) (spin float) (speed float) (lifetime float))
+  (when *target*
+    (let ((layer-gap (meters 2.0))
+          (pos (new 'stack-no-clear 'vector))
+          (dir (new 'stack-no-clear 'vector))
+          (cx (-> *target* control trans x))
+          (cz (-> *target* control trans z))
+          (offset (rand-vu-float-range 0.0 65536.0))
+          (sp (if (= spin 0.0) (if (rand-vu-percent? 0.5) 1.0 -1.0) spin)))
+      (dotimes (l layers)
+        (dotimes (i amount)
+          (let* ((a (+ offset (* twist (the float l)) (* 65536.0 (/ (the float i) (the float amount)))))
+                 (dx (sin a))
+                 (dz (cos a))
+                 ;; sideways direction around Jak
+                 (tx (* sp dz))
+                 (tz (* sp (- dx))))
+            (set-vector! pos
+                         (+ cx (* dx radius))
+                         (+ (-> *target* control trans y) (* (the float l) layer-gap))
+                         (+ cz (* dz radius))
+                         1.0)
+            (set-vector! dir (- tx (* dx inward)) 0.0 (- tz (* dz inward)) 1.0)
+            (vector-normalize! dir 1.0)
+            (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) (* 0.25 bh-projectile-homing) 0.25 1))))))
+  0)
+
+
 (define bh-pattern-unlock-amount 5)
 (defun bh-get-unlocked-patterns ()
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 14)
+(define bh-implemented-patterns 17)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -689,7 +764,7 @@
                     bh-patterns-seen
                     (rand-vu-int-count patternCount)
                   )))
-    (set! pattern 13) ;; DEBUG
+    (set! pattern 16) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -846,6 +921,45 @@
             (* 0.5 bh-projectile-homing)                   ;; Homing
             )
           )
+        ((14)
+          (bh-wall
+            (the int (* 8.0 bh-difficulty-scale-half))       ;; Columns
+            (/ (meters 3.1) bh-difficulty-scale-third)        ;; Spacing
+            (the int (* 5.0 bh-difficulty-scale-quartre))     ;; Rows
+            (/ (meters 2.0) bh-difficulty-scale-third)        ;; Row gap
+            (- (meters 1.0) bh-difficulty)                    ;; height
+            2                                                 ;; group >= 1 gap decider
+            1                                                 ;; Gap
+            (* (meters 11.0) bh-difficulty-scale-half)     ;; Speed
+            )
+            (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
+        )
+        ((15)
+          (bh-wall
+            (the int (* 9.0 bh-difficulty-scale-half))        ;; Columns
+            (/ (meters 2.8) bh-difficulty-scale-quartre)      ;; Spacing
+            (the int (* 1.0 bh-difficulty-scale))             ;; Rows
+            (meters 1.25)                                      ;; Row gap
+            (- (meters 0.1) bh-difficulty)                    ;; height
+            1                                                 ;; group >= 1 gap decider
+            0                                                 ;; Gap
+            (* (meters 13.0) bh-difficulty-scale-half)     ;; Speed
+            )
+            (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
+        )
+        ((16)
+          (bh-tornado
+            (/ (meters 20.0) bh-difficulty-scale-quartre)        ;; Radius
+            (the int (* 5.0 bh-difficulty-scale))             ;; Layers
+            (the int (/ 12.0 bh-difficulty-scale))            ;; Bullet per ring
+            (* (degrees 30.0) bh-difficulty-scale-third)       ;; Twist
+            (* 1.0 bh-difficulty-scale)                         ;; Inwards
+            0.0                                                 ;; Spin Rotation direction 0 is random
+            (* (meters 13.0) bh-difficulty-scale-third)     ;; Speed
+            (- 2.5 (* 0.75 bh-difficulty))                     ;; Lifetime
+            )
+            (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
+        )
         )))
   0)
 

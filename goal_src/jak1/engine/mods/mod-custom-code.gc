@@ -510,12 +510,38 @@
             (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 1))))))
   0)
 
+;; Flat ring around Jak that slowly expands outward.
+;; radius = starting distance of the ring from Jak
+;; amount = number of bullets in the ring
+;; speed  = outward speed of every bullet
+;; gap = half-width of the empty zone in front of Jak (use (degrees 15.0) for +-15 degrees)
+(defun bh-ring-out ((radius float) (amount int) (speed float) (gap float) (lifetime float) (homing float))
+  (when *target*
+    (let ((pos (new 'stack-no-clear 'vector))
+          (dir (new 'stack-no-clear 'vector))
+          (cx (-> *target* control trans x))
+          (cy (+ (-> *target* control trans y) (meters 1.2)))
+          (cz (-> *target* control trans z))
+          (facing (y-angle (-> *target* control)))
+          (offset (rand-vu-float-range 0.0 65536.0)))
+      (dotimes (i amount)
+        (let* ((ang (+ offset (* 65536.0 (/ (the float i) (the float amount)))))
+               ;; angle relative to Jak's facing, wrapped to -32768..32767
+               (rel (the float (sar (shl (the int (- ang facing)) 48) 48)))
+               (dx (sin ang))
+               (dz (cos ang)))
+          (when (>= (fabs rel) gap)
+            (set-vector! pos (+ cx (* dx radius)) cy (+ cz (* dz radius)) 1.0)
+            (set-vector! dir dx 0.0 dz 1.0)
+            (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 1))))))
+  0)
+
 (define bh-pattern-unlock-amount 5)
 (defun bh-get-unlocked-patterns ()
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 10)
+(define bh-implemented-patterns 11)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -538,8 +564,9 @@
     (let* ((patternCount (min (bh-get-unlocked-patterns) bh-implemented-patterns))
        (pattern (if (< bh-patterns-seen patternCount)
                     bh-patterns-seen
-                    9 ;; (rand-vu-int-count patternCount)
+                    (rand-vu-int-count patternCount)
                   )))
+    (set! pattern 10) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -592,7 +619,7 @@
             (meters 2.0)                                     ;; Height
             (- 2.5 (* 0.5 bh-difficulty))                    ;; Lifetime
             (* (meters 3.0) bh-difficulty-scale-half)        ;; Speed
-            (+ 20.0 (* bh-projectile-homing 0.25))           ;; Homing
+            (+ 20.0 (* bh-projectile-homing 0.125))           ;; Homing
             )
         )
         ((5)
@@ -602,7 +629,7 @@
             (/ (meters 12.0) bh-difficulty-scale-quartre)    ;; Distance
             (- 2.0 (* 0.5 bh-difficulty))                    ;; Lifetime
             (* (meters 1.0) bh-difficulty-scale-half)        ;; Speed
-            (+ 10.0 (* bh-projectile-homing 0.33))           ;; Homing
+            (+ 10.0 (* bh-projectile-homing 0.25))           ;; Homing
             )
         )
         ((6)
@@ -648,6 +675,16 @@
             (/ 1.0 bh-difficulty-scale)         ;; Spread 0 - 1
             (- 3.5 (* 0.5 bh-difficulty))                     ;; Lifetime
             (+ 5.0 (* bh-projectile-homing 0.25))             ;; Homing
+            )
+        )
+        ((10)
+          (bh-ring-out
+            (/ (meters 11.0) bh-difficulty-scale-half)     ;; Radius
+            (the int (* 6.0 bh-difficulty-scale))      ;; Amount
+            (/ (meters 12.0) bh-difficulty-scale-lesser)         ;; Speed
+            (/ (degrees 25.0) bh-difficulty-scale-half)         ;; Gap
+            (- 2.25 (* 0.6 bh-difficulty))                     ;; Lifetime
+            (+ 30.0 (* bh-projectile-homing 0.75))             ;; Homing
             )
         )
         )))

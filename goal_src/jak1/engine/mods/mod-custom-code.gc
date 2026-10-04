@@ -739,7 +739,7 @@
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 17)
+(define bh-implemented-patterns 18)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -764,7 +764,7 @@
                     bh-patterns-seen
                     (rand-vu-int-count patternCount)
                   )))
-    ;; (set! pattern 16) ;; DEBUG
+     (set! pattern 17) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -959,6 +959,17 @@
             (- 2.5 (* 0.75 bh-difficulty))                     ;; Lifetime
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
+        )
+        ((17)
+          (bh-ring-out
+            (/ (meters 11.0) bh-difficulty-scale-third)     ;; Radius
+            (the int (* 3.0 bh-difficulty-scale-lesser))      ;; Amount
+            (* (meters 7.5) bh-difficulty-scale-quartre)         ;; Speed
+            (/ (degrees 25.0) bh-difficulty-scale-half)         ;; Gap
+            (- 5.5 (* 0.5 bh-difficulty))                     ;; Lifetime
+            (+ 100.0 (* bh-projectile-homing 0.5))             ;; Homing
+            )
+            (set! bh-next-attack-time (+ bh-next-attack-time (seconds 2.0)))
         )
         )))
   0)

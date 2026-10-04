@@ -1041,6 +1041,10 @@
   (set! *bh-trail-count* 0)
   0)
 
+(defun bh-jak-took-damage ()
+  (bh-clear-bullets)
+0)
+
 (define *bh-resume-time* 0)
 (define *bh-last-movie* #f)
 (defun bullet-hell-update ()

@@ -764,7 +764,7 @@
                     bh-patterns-seen
                     (rand-vu-int-count patternCount)
                   )))
-     (set! pattern 17) ;; DEBUG
+     (set! pattern 13) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -917,8 +917,8 @@
             (the int (* 8.0 bh-difficulty-scale))            ;; Amount
             (meters 10.0)                                   ;; Lead
             (- 2.7 (* 0.6 bh-difficulty))                  ;; Lifetime
-            (* (meters 16.0) bh-difficulty-scale-third)     ;; Speed
-            (* 0.5 bh-projectile-homing)                   ;; Homing
+            (* (meters 16.0) bh-difficulty-scale-quarte)     ;; Speed
+            (* 0.54 bh-projectile-homing)                   ;; Homing
             )
           )
         ((14)

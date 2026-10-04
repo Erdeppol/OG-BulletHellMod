@@ -71,7 +71,7 @@
       ;; (set! (-> (the-as projectile-yellow proc) max-turn) 0.0)
       (set! (-> (the-as projectile-yellow proc) bh-homing) homing)
       (set! (-> (the-as projectile-yellow proc) bh-nokill) lowSpeedNoKill)
-      (set! (-> (the-as projectile-yellow proc) bh-grace) (the-as int (seconds 0.3)))
+      (set! (-> (the-as projectile-yellow proc) bh-grace) (the-as int (seconds 0.33)))
       (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target)))
       
       (set! (-> *bh-handles* *bh-handle-idx*) (the-as uint64 (process->handle proc)))
@@ -100,8 +100,32 @@
           0.0
           (- (cos ang))
           1.0)
-        (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) bh-projectile-homing 0.25 0))))
+        (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) bh-projectile-homing 0.25 1))))
   0)
+
+(defun bh-ring-height ((center vector) (n int) (offset float) (radius float) (height float) (lifetime float) (speed float) (homing float))
+  (let* ((pos (new 'stack-no-clear 'vector))
+         (dir (new 'stack-no-clear 'vector)))
+    (dotimes (i n)
+      (let* ((ang (+ offset
+                     (* (/ 65536.0 (the float n))
+                        (the float i)))))
+        (set-vector!
+          pos
+          (+ (-> center x)
+             (* (sin ang) radius))
+          (+ (-> center y) height)
+          (+ (-> center z)
+             (* (cos ang) radius))
+          1.0)
+        (set-vector!
+          dir
+          (- (sin ang))
+          0.0
+          (- (cos ang))
+          1.0)
+        (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 1))))
+  0)  
 
 (define bh-next-attack-time 0)
 (define *bh-spin* 0.0)
@@ -735,12 +759,12 @@
   0)
 
 
-(define bh-pattern-unlock-amount 5)
+(define bh-pattern-unlock-amount 3)
 (defun bh-get-unlocked-patterns ()
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 19)
+(define bh-implemented-patterns 21)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -765,7 +789,7 @@
                     bh-patterns-seen
                     (rand-vu-int-count patternCount)
                   )))
-    ;; (set! pattern 18) ;; DEBUG
+     (set! pattern 19) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -856,8 +880,8 @@
         )
         ((1)
           (bh-cross
-            (/ (meters 20.0) bh-difficulty-scale-quartre)     ;; Distance
-            (/ (meters 0.5) bh-difficulty-scale-third)        ;; Spacing
+            (/ (meters 19.0) bh-difficulty-scale-quartre)     ;; Distance
+            (/ (meters 0.4) bh-difficulty-scale-third)        ;; Spacing
             (the int (* 3.0 bh-difficulty-scale-quartre))       ;; Amount
             (* (meters 3.0) bh-difficulty-scale-half)        ;; Base Speed
             (* (meters 4.0) bh-difficulty-scale-half)         ;; Step Speed adding
@@ -973,6 +997,43 @@
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 2.0)))
         )
         ((18)
+          ;; Ring
+          (bh-ring-height
+            *bh-center*
+            (the int (* 5.0 bh-difficulty-scale-third))       ;; Amount
+            *bh-spin*
+            (/ (meters 20.0) bh-difficulty-scale-quartre)  ;; Distance
+            (meters 0.5)      ;; Height
+            (- 3.5 (* 0.5 bh-difficulty))                 ;; Lifetime
+            (* (meters 9.0) bh-difficulty-scale-third)       ;; Speed
+            (* 0.1 bh-projectile-homing)                   ;; Homing
+          )
+          (bh-ring-height
+            *bh-center*
+            (the int (* 5.0 bh-difficulty-scale-third))       ;; Amount
+            *bh-spin*
+            (/ (meters 30.0) bh-difficulty-scale-quartre)  ;; Distance
+            (meters 7.0)      ;; Height
+            (- 3.5 (* 0.5 bh-difficulty))                 ;; Lifetime
+            (* (meters 8.0) bh-difficulty-scale-third)       ;; Speed
+            (* 0.1 bh-projectile-homing)                   ;; Homing
+          )
+          (set! bh-next-attack-time (+ bh-next-attack-time (seconds (* 1.0 bh-difficulty))))
+          (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
+
+        )
+        ((19)
+          (bh-ring
+            *bh-center*
+            (the int (* 7.0 bh-difficulty-scale-half))       ;; Amount
+            *bh-spin*
+            (/ (meters 16.0) bh-difficulty-scale-third)  ;; Distance
+            (- 2.7 (* 0.65 bh-difficulty))                 ;; Lifetime
+            (meters (* 1.0 bh-difficulty-scale))       ;; Speed
+          )
+          (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
+        )
+        ((20)
           (bh-ball
             (/ (meters 35.0) bh-difficulty-scale-quartre)     ;; Distance
             (/ (meters 15.0) bh-difficulty-scale-half)      ;; Height
@@ -1152,7 +1213,7 @@
   (when *debug-segment*
     (orb-placer-maintenance))
 
-  ;; (debugcheator)
+  (debugcheator)
   (bullet-hell-update)
   (bh-tint-particles)
 

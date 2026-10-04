@@ -71,7 +71,7 @@
       ;; (set! (-> (the-as projectile-yellow proc) max-turn) 0.0)
       (set! (-> (the-as projectile-yellow proc) bh-homing) homing)
       (set! (-> (the-as projectile-yellow proc) bh-nokill) lowSpeedNoKill)
-      (set! (-> (the-as projectile-yellow proc) bh-grace) (the-as int (seconds 0.2)))
+      (set! (-> (the-as projectile-yellow proc) bh-grace) (the-as int (seconds 0.3)))
       (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target)))
       
       (set! (-> *bh-handles* *bh-handle-idx*) (the-as uint64 (process->handle proc)))
@@ -407,31 +407,107 @@
                 (bh-spawn-bullet pos dir lifetime b-speed (the-as uint 0) (* 0.5 bh-projectile-homing) 0.25 0))))))))
   0)
 
-;; Cross of bullets at a random spot near Jak, rotated randomly.
-;; distance   = how far from Jak the cross center spawns
-;; spacing    = gap between bullets along an arm
-;; amount     = bullets per arm (total = 4 x amount)
-;; base-speed = speed of the bullet closest to the center
-;; step-speed = extra speed per bullet further out
 (defun bh-cross ((distance float) (spacing float) (amount int) (base-speed float) (step-speed float) (lifetime float) (homing float))
   (when *target*
-    (let ((pos (new 'stack-no-clear 'vector))
-          (dir (new 'stack-no-clear 'vector))
-          (place-ang (rand-vu-float-range 0.0 65536.0))
-          (cross-ang (rand-vu-float-range 0.0 65536.0)))
-      (let ((cx (+ (-> *target* control trans x) (* (sin place-ang) distance)))
-            (cy (+ (-> *target* control trans y) (meters 1.2)))
-            (cz (+ (-> *target* control trans z) (* (cos place-ang) distance))))
-        (dotimes (arm 4)
-          (let* ((ang (+ cross-ang (* 16384.0 (the float arm))))
-                 (dx (sin ang))
-                 (dz (cos ang)))
-            (dotimes (i amount)
-              (let* ((dist (* (the float (+ i 1)) spacing))
-                     (b-speed (+ base-speed (* (the float i) step-speed))))
-                (set-vector! pos (+ cx (* dx dist)) cy (+ cz (* dz dist)) 1.0)
-                (set-vector! dir dx 0.0 dz 1.0)
-                (bh-spawn-bullet pos dir lifetime b-speed (the-as uint 0) homing 0.25 1))))))))
+    (let* ((pos (new 'stack-no-clear 'vector))
+           (dir (new 'stack-no-clear 'vector))
+           (facing (y-angle (-> *target* control)))
+           ;; center: random direction in front of Jak, random elevation, on a sphere of radius `distance`
+           (place-ang (+ facing (rand-vu-float-range -20000.0 20000.0)))
+           (place-elev (rand-vu-float-range -4000.0 12000.0))
+           (flat (* (cos place-elev) distance))
+           (cx (+ (-> *target* control trans x) (* (sin place-ang) flat)))
+           (cy (+ (-> *target* control trans y) (meters 1.2) (* (sin place-elev) distance)))
+           (cz (+ (-> *target* control trans z) (* (cos place-ang) flat)))
+           ;; cross orientation: random axis u in 3D
+           (a1 (rand-vu-float-range 0.0 65536.0))
+           (e1 (rand-vu-float-range -16384.0 16384.0))
+           (ux (* (cos e1) (sin a1)))
+           (uy (sin e1))
+           (uz (* (cos e1) (cos a1)))
+           ;; h = horizontal vector perpendicular to u
+           (hx (cos a1))
+           (hz (- (sin a1)))
+           ;; p = u x h
+           (px (* uy hz))
+           (py (- (* uz hx) (* ux hz)))
+           (pz (- (* uy hx)))
+           ;; v = rotate h toward p by a random angle, so v is perpendicular to u
+           (t1 (rand-vu-float-range 0.0 65536.0))
+           (vx (+ (* (cos t1) hx) (* (sin t1) px)))
+           (vy (* (sin t1) py))
+           (vz (+ (* (cos t1) hz) (* (sin t1) pz))))
+      (dotimes (arm 4)
+        (let* ((s (if (< arm 2) 1.0 -1.0))
+               (dx (* s (if (zero? (logand arm 1)) ux vx)))
+               (dy (* s (if (zero? (logand arm 1)) uy vy)))
+               (dz (* s (if (zero? (logand arm 1)) uz vz))))
+          (dotimes (i amount)
+            (let* ((dist (* (the float (+ i 1)) spacing))
+                   (b-speed (+ base-speed (* (the float i) step-speed))))
+              (set-vector! pos (+ cx (* dx dist)) (+ cy (* dy dist)) (+ cz (* dz dist)) 1.0)
+              (set-vector! dir dx dy dz 1.0)
+              (bh-spawn-bullet pos dir lifetime b-speed (the-as uint 0) homing 0.25 1)))))))
+  0)
+
+;; Ring of bullets at a random spot in front of Jak, randomly tilted.
+;; distance = radius of the sphere around Jak where the center spawns
+;; radius   = radius of the circle itself
+;; speed    = outward speed of every bullet
+;; Spiraling ring. Same placement as before.
+;; swirl      = tangential velocity as a fraction of forward speed (0 = straight hoop, 1 = strong spin)
+;; spread     = outward velocity as a fraction of forward speed (0 = ring keeps its size)
+;; step-speed = extra speed per bullet index, which turns the ring into a spiral arm
+(defun bh-circle ((amount int) (distance float) (radius float) (speed float) (swirl float) (spread float) (lifetime float) (homing float))
+  (when *target*
+    (let* (
+           (pos (new 'stack-no-clear 'vector))
+           (dir (new 'stack-no-clear 'vector))
+           (n (new 'stack-no-clear 'vector))
+           (h (new 'stack-no-clear 'vector))
+           (facing (y-angle (-> *target* control)))
+           (place-ang (+ facing (rand-vu-float-range -20000.0 20000.0)))
+           (place-elev (rand-vu-float-range -4000.0 12000.0))
+           (flat (* (cos place-elev) distance))
+           (jx (-> *target* control trans x))
+           (jy (+ (-> *target* control trans y) (meters 1.2)))
+           (jz (-> *target* control trans z))
+           (cx (+ jx (* (sin place-ang) flat)))
+           (cy (+ jy (* (sin place-elev) distance)))
+           (cz (+ jz (* (cos place-ang) flat))))
+      (set-vector! n (- jx cx) (- jy cy) (- jz cz) 1.0)
+      (vector-normalize! n 1.0)
+      (set-vector! h (- (-> n z)) 0.0 (-> n x) 1.0)
+      (vector-normalize! h 1.0)
+      (let ((px (- (* (-> n y) (-> h z)) (* (-> n z) (-> h y))))
+            (py (- (* (-> n z) (-> h x)) (* (-> n x) (-> h z))))
+            (pz (- (* (-> n x) (-> h y)) (* (-> n y) (-> h x)))))
+        (dotimes (i amount)
+          (let* ((t1 (* 65536.0 (/ (the float i) (the float amount))))
+                 (c (cos t1))
+                 (s (sin t1))
+                 ;; radial direction in the ring plane
+                 (dx (+ (* c (-> h x)) (* s px)))
+                 (dy (+ (* c (-> h y)) (* s py)))
+                 (dz (+ (* c (-> h z)) (* s pz)))
+                 ;; tangent = n x radial
+                 (tx (- (* (-> n y) dz) (* (-> n z) dy)))
+                 (ty (- (* (-> n z) dx) (* (-> n x) dz)))
+                 (tz (- (* (-> n x) dy) (* (-> n y) dx)))
+                 )
+            (set-vector! pos
+                         (+ cx (* dx radius))
+                         (+ cy (* dy radius))
+                         (+ cz (* dz radius))
+                         1.0)
+            ;; forward + outward + sideways
+            (set-vector! dir
+                         (+ (-> n x) (* dx spread) (* tx swirl))
+                         (+ (-> n y) (* dy spread) (* ty swirl))
+                         (+ (-> n z) (* dz spread) (* tz swirl))
+                         1.0)
+            (vector-normalize! dir 1.0)
+            (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 1))))))
   0)
 
 (define bh-pattern-unlock-amount 5)
@@ -439,7 +515,7 @@
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 8)
+(define bh-implemented-patterns 10)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -462,20 +538,20 @@
     (let* ((patternCount (min (bh-get-unlocked-patterns) bh-implemented-patterns))
        (pattern (if (< bh-patterns-seen patternCount)
                     bh-patterns-seen
-                    1 ;; (rand-vu-int-count patternCount)
+                    9 ;; (rand-vu-int-count patternCount)
                   )))
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
-        ((0)
+        ((8)
           ;; Ring
           (bh-ring
             *bh-center*
             (the int (* 3.0 bh-difficulty-scale))       ;; Amount
             *bh-spin*
-            (/ (meters 18.0) bh-difficulty-scale-half)  ;; Distance
-            (- 2.2 (* 0.65 bh-difficulty))                 ;; Lifetime
-            (* (meters 10.0) bh-difficulty-scale)       ;; Speed
+            (/ (meters 20.0) bh-difficulty-scale-half)  ;; Distance
+            (- 2.3 (* 0.65 bh-difficulty))                 ;; Lifetime
+            (* (meters 10.5) bh-difficulty-scale)       ;; Speed
           )
         )
         ((1)
@@ -484,8 +560,8 @@
             (the int (* 3.0 bh-difficulty-scale))       ;; Amount
             (/ (meters 18.0) bh-difficulty-scale-third)  ;; Distance Spacing
             (meters 14.0)                               ;; Height
-            (- 2.3 (* 0.6 bh-difficulty))              ;; Lifetime
-            (* (meters 10.5) bh-difficulty-scale-half)       ;; Speed
+            (- 2.4 (* 0.5 bh-difficulty))              ;; Lifetime
+            (* (meters 9.5) bh-difficulty-scale-quartre)       ;; Speed
             )
         )
         ((2)
@@ -514,9 +590,9 @@
             (/ (meters 4.0) bh-difficulty-scale-half)        ;; Safe space
             (/ (meters 12.0) bh-difficulty-scale-half)       ;; Distance Spacing
             (meters 2.0)                                     ;; Height
-            (- 2.0 (* 0.5 bh-difficulty))                    ;; Lifetime
+            (- 2.5 (* 0.5 bh-difficulty))                    ;; Lifetime
             (* (meters 3.0) bh-difficulty-scale-half)        ;; Speed
-            (+ 30.0 (* bh-projectile-homing 0.25))           ;; Homing
+            (+ 20.0 (* bh-projectile-homing 0.25))           ;; Homing
             )
         )
         ((5)
@@ -544,12 +620,35 @@
             (+ 2 (min 1 (the int (* 2.0 bh-difficulty))))           ;; bullets per row
             (/ (meters 6.0) bh-difficulty-scale)         ;; Spacing in wall
             (+ 2 (min 1 (the int (* 2.0 bh-difficulty))))         ;; rows per wall (2 to 3)
-            (/ (meters 10.0) bh-difficulty-scale-half)       ;; distance of walls from Jak
+            (/ (meters 14.0) bh-difficulty-scale-half)       ;; distance of walls from Jak
             (+ 1.0 (* 0.25 bh-difficulty))                 ;; inward drift
             (- 2.5 (* 0.6 bh-difficulty))                  ;; lifetime
-            (* (meters 16.0) bh-difficulty-scale-third)     ;; speed
-            (* (meters 7.0) bh-difficulty-scale-third)     ;; speed Step
+            (* (meters 10.0) bh-difficulty-scale-third)     ;; speed
+            (* (meters 4.0) bh-difficulty-scale-third)     ;; speed Step subtracting
             )     
+        )
+        ((0)
+          (bh-cross
+            (/ (meters 20.0) bh-difficulty-scale-quartre)     ;; Distance
+            (/ (meters 0.5) bh-difficulty-scale-third)        ;; Spacing
+            (the int (* 3.0 bh-difficulty-scale-quartre))       ;; Amount
+            (* (meters 3.0) bh-difficulty-scale-half)        ;; Base Speed
+            (* (meters 5.0) bh-difficulty-scale-half)         ;; Step Speed adding
+            (- 3.0 (* 0.5 bh-difficulty))                     ;; Lifetime
+            (+ 10.0 (* bh-projectile-homing 0.33))            ;; Homing
+            )
+        )
+        ((9)
+          (bh-circle
+            (the int (* 5.0 bh-difficulty-scale-half))     ;; Amount
+            (/ (meters 20.0) bh-difficulty-scale-quartre)     ;; Distance
+            (/ (meters 4.5) bh-difficulty-scale)        ;; Radius
+            (* (meters 4.5) bh-difficulty-scale-lesser)         ;; Speed
+            1.0         ;; Swirl 0 - 1
+            (/ 1.0 bh-difficulty-scale)         ;; Spread 0 - 1
+            (- 3.5 (* 0.5 bh-difficulty))                     ;; Lifetime
+            (+ 5.0 (* bh-projectile-homing 0.25))             ;; Homing
+            )
         )
         )))
   0)

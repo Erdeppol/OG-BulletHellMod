@@ -750,7 +750,7 @@
                  (tz (* sp (- dx))))
             (set-vector! pos
                          (+ cx (* dx radius))
-                         (+ (-> *target* control trans y) (* (the float l) layer-gap))
+                         (+ (-> *target* control trans y) (* (the float l) layer-gap) (meters -2.0))
                          (+ cz (* dz radius))
                          1.0)
             (set-vector! dir (- tx (* dx inward)) 0.0 (- tz (* dz inward)) 1.0)
@@ -764,7 +764,7 @@
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 21)
+(define bh-implemented-patterns 23)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -780,6 +780,7 @@
     (set! bh-difficulty-scale-half (+ 1.0 (* 0.5 bh-difficulty)))
     (set! bh-difficulty-scale-third (+ 1.0 (* 0.33 bh-difficulty)))
     (set! bh-difficulty-scale-quartre (+ 1.0 (* 0.25 bh-difficulty)))
+    (set! bh-difficulty-scale-mini (+ 1.0 (* 0.125 bh-difficulty)))
     (set! bh-difficulty-scale-lesser (+ 1.0 (* 0.75 bh-difficulty)))
     (set! bh-projectile-homing (+ 0.01 (* 60.0 bh-difficulty)))
 
@@ -789,7 +790,7 @@
                     bh-patterns-seen
                     (rand-vu-int-count patternCount)
                   )))
-     (set! pattern 19) ;; DEBUG
+     (set! pattern 22) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -974,7 +975,7 @@
         )
         ((16)
           (bh-tornado
-            (/ (meters 25.0) bh-difficulty-scale-quartre)        ;; Radius
+            (/ (meters 26.0) bh-difficulty-scale-quartre)        ;; Radius
             (the int (* 5.0 bh-difficulty-scale))             ;; Layers
             (the int (/ 12.0 bh-difficulty-scale))            ;; Bullet per ring
             (* (degrees 30.0) bh-difficulty-scale-third)       ;; Twist
@@ -1033,6 +1034,19 @@
           )
           (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
         )
+        ((21)
+          (bh-tornado
+            (/ (meters 20.0) bh-difficulty-scale-quartre)        ;; Radius
+            (the int (* 5.0 bh-difficulty-scale))             ;; Layers
+            (the int (/ 8.0 bh-difficulty-scale))            ;; Bullet per ring
+            (* (degrees 30.0) bh-difficulty-scale-third)       ;; Twist
+            (* 0.5 bh-difficulty-scale)                         ;; Inwards
+            0.0                                                 ;; Spin Rotation direction 0 is random
+            (* (meters 6.0) bh-difficulty-scale-third)     ;; Speed
+            (- 4.0 (* 0.7 bh-difficulty))                     ;; Lifetime
+            )
+            (set! bh-next-attack-time (+ bh-next-attack-time (seconds 3.0)))
+        )
         ((20)
           (bh-ball
             (/ (meters 35.0) bh-difficulty-scale-quartre)     ;; Distance
@@ -1054,6 +1068,19 @@
             (* (meters 17.0) bh-difficulty-scale-quartre)     ;; Speed
             (* 0.4 bh-projectile-homing)                   ;; Homing
             )
+          )
+        ((22)
+          (bh-ball
+            (meters 35.0)     ;; Distance
+            (/ (meters 19.0) bh-difficulty-scale-half)      ;; Height
+            (* (meters 4.0) bh-difficulty-scale-half)           ;; Radius
+            (the int (* 12.0 bh-difficulty-scale))            ;; Amount
+            (meters 20.0)                                   ;; Lead
+            (- 3.5 (* 0.6 bh-difficulty))                  ;; Lifetime
+            (* (meters 15.5) bh-difficulty-scale-quartre)     ;; Speed
+            (+ 40.0 (* bh-projectile-homing 0.25))                   ;; Homing
+            )
+            (set! bh-next-attack-time (+ bh-next-attack-time (seconds 2.5)))
           )
         )))
   0)

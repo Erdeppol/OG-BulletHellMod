@@ -666,7 +666,7 @@
 (defun bh-wall ((columns int) (spacing float) (rows int) (row-gap float) (height float) (group int) (gap int) (speed float))
   (when *target*
     (let ((lifetime 3.0)
-          (distance (meters 20.0))
+          (distance (meters 25.0))
           (fwd (new 'stack-no-clear 'vector))
           (pos (new 'stack-no-clear 'vector))
           (dir (new 'stack-no-clear 'vector)))
@@ -764,7 +764,7 @@
                     bh-patterns-seen
                     (rand-vu-int-count patternCount)
                   )))
-    (set! pattern 16) ;; DEBUG
+    ;; (set! pattern 16) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -774,7 +774,7 @@
             *bh-center*
             (the int (* 3.0 bh-difficulty-scale))       ;; Amount
             *bh-spin*
-            (/ (meters 20.0) bh-difficulty-scale-half)  ;; Distance
+            (/ (meters 25.0) bh-difficulty-scale-half)  ;; Distance
             (- 2.3 (* 0.65 bh-difficulty))                 ;; Lifetime
             (* (meters 10.5) bh-difficulty-scale)       ;; Speed
           )
@@ -949,7 +949,7 @@
         )
         ((16)
           (bh-tornado
-            (/ (meters 20.0) bh-difficulty-scale-quartre)        ;; Radius
+            (/ (meters 25.0) bh-difficulty-scale-quartre)        ;; Radius
             (the int (* 5.0 bh-difficulty-scale))             ;; Layers
             (the int (/ 12.0 bh-difficulty-scale))            ;; Bullet per ring
             (* (degrees 30.0) bh-difficulty-scale-third)       ;; Twist

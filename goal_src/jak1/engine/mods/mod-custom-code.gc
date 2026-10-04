@@ -103,7 +103,7 @@
         (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) bh-projectile-homing 0.25 0))))
   0)
 
-(define bh-next-attack-time 1)
+(define bh-next-attack-time 0)
 (define *bh-spin* 0.0)
 (define *bh-center* (new 'global 'vector))
 
@@ -364,6 +364,72 @@
       (set! *bh-trail-active* #f)))
   0)
 
+(define *bh-circs-active* #f)
+(define *bh-circs-index* 0)
+(define *bh-circs-spin* 1.0)
+(define *bh-circs-amount* 1)
+(define *bh-circs-next* 0)
+(define *bh-circs-delay* 0)
+(define *bh-circs-radius* 0.0)
+(define *bh-circs-height* 0.0)
+(define *bh-circs-lifetime* 0.0)
+(define *bh-circs-speed* 0.0)
+(define *bh-circs-homing* 0.0)
+;; horizontal direction of the first bullet, from Jak
+(define *bh-circs-bx* 0.0)
+(define *bh-circs-bz* 0.0)
+
+;; side: 1.0 = start on camera right, -1.0 = start on camera left, 0.0 = random
+(defun bh-circle-seq-start ((radius float) (height float) (amount int) (delay float) (side float) (lifetime float) (speed float) (homing float))
+  (let ((fwd (new 'stack-no-clear 'vector))
+        (s (if (= side 0.0)
+             (if (rand-vu-percent? 0.5) 1.0 -1.0)
+             side)))
+    ;; camera forward, flattened, same as bh-side-pair
+    (set! (-> fwd quad) (-> *math-camera* inv-camera-rot vector 2 quad))
+    (set! (-> fwd y) 0.0)
+    (vector-normalize! fwd 1.0)
+    ;; first bullet sits on the camera's right (s = 1) or left (s = -1)
+    (set! *bh-circs-bx* (* s (-> fwd z)))
+    (set! *bh-circs-bz* (* s (- (-> fwd x))))
+    ;; travel across the far side of Jak: right start goes left, left start goes right
+    (set! *bh-circs-spin* (- s)))
+  (set! *bh-circs-radius* radius)
+  (set! *bh-circs-height* height)
+  (set! *bh-circs-amount* amount)
+  (set! *bh-circs-delay* (the int (fsec delay)))
+  (set! *bh-circs-lifetime* lifetime)
+  (set! *bh-circs-speed* speed)
+  (set! *bh-circs-homing* homing)
+  (set! *bh-circs-index* 0)
+  (set! *bh-circs-next* (the-as int (current-time)))
+  (set! *bh-circs-active* #t)
+  0)
+
+(defun bh-circle-seq-update ()
+  (when (and *target* *bh-circs-active* (>= (current-time) *bh-circs-next*))
+    (let* ((a (* (/ 65536.0 (the float *bh-circs-amount*)) (the float *bh-circs-index*)))
+           (c (cos a))
+           (s (sin a))
+           ;; first-bullet direction rotated by a around the vertical axis
+           (dx (+ (* *bh-circs-bx* c) (* *bh-circs-spin* *bh-circs-bz* s)))
+           (dz (- (* *bh-circs-bz* c) (* *bh-circs-spin* *bh-circs-bx* s)))
+           (pos (new 'stack-no-clear 'vector))
+           (dir (new 'stack-no-clear 'vector)))
+      (set-vector! pos
+                   (+ (-> *target* control trans x) (* dx *bh-circs-radius*))
+                   (+ (-> *target* control trans y) *bh-circs-height*)
+                   (+ (-> *target* control trans z) (* dz *bh-circs-radius*))
+                   1.0)
+      ;; start out pointing at Jak; homing takes over from there
+      (set-vector! dir (- dx) 0.0 (- dz) 1.0)
+      (bh-spawn-bullet pos dir *bh-circs-lifetime* *bh-circs-speed* (the-as uint 0) *bh-circs-homing* 0.25 0)
+      (+! *bh-circs-index* 1)
+      (set! *bh-circs-next* (the-as int (+ (current-time) *bh-circs-delay*)))
+      (if (>= *bh-circs-index* *bh-circs-amount*)
+        (set! *bh-circs-active* #f))))
+  0)
+
 ;; Four walls around the center, each moving along its own side (clockwise).
 ;; half-size = distance from center to each wall, count = bullets per wall,
 ;; inward = 0.0 pure train, >0 drifts toward the center so walls close in.
@@ -533,15 +599,14 @@
           (when (>= (fabs rel) gap)
             (set-vector! pos (+ cx (* dx radius)) cy (+ cz (* dz radius)) 1.0)
             (set-vector! dir dx 0.0 dz 1.0)
-            (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 1))))))
+            (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.5 1))))))
   0)
-
 (define bh-pattern-unlock-amount 5)
 (defun bh-get-unlocked-patterns ()
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 11)
+(define bh-implemented-patterns 13)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -566,7 +631,7 @@
                     bh-patterns-seen
                     (rand-vu-int-count patternCount)
                   )))
-    (set! pattern 10) ;; DEBUG
+    (set! pattern 12) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -634,13 +699,14 @@
         )
         ((6)
           (bh-trail-start
-            (- 1.5 (* 0.25 bh-difficulty))                    ;; Duration
+            (- 2.0 (* 0.25 bh-difficulty))                    ;; Duration
             (/ 0.4 bh-difficulty-scale-half)                  ;; Rate
-            (/ 0.7 bh-difficulty-scale-half)               ;; Delay
+            (/ 0.75 bh-difficulty-scale-third)               ;; Delay
             (- 1.25 (* 0.25 bh-difficulty))                   ;; Lifetime
             (* (meters 4.4) bh-difficulty-scale-lesser)              ;; Speed
             (+ 20.0 (* bh-projectile-homing))                 ;; Homing
             )
+          (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
         )
         ((7)
           (bh-train
@@ -687,6 +753,29 @@
             (+ 30.0 (* bh-projectile-homing 0.75))             ;; Homing
             )
         )
+        ((11)
+          (bh-side-pair
+            (/ (meters 16.0) bh-difficulty-scale-third)     ;; Distance
+            (/ (meters 6.0) bh-difficulty-scale-quartre)    ;; Height
+            (/ (meters 22.0) bh-difficulty-scale-third)     ;; Side distance
+            (- 4.2 (* 0.7 bh-difficulty))                  ;; Lifetime
+            (* (meters 9.0) bh-difficulty-scale-quartre)     ;; Speed
+            (+ 100.0 bh-projectile-homing)                   ;; Homing
+            )
+          )
+        ((12)
+          (bh-circle-seq-start
+            (/ (meters 18.5) bh-difficulty-scale-quartre)     ;; Radius
+            (/ (meters 9.0) bh-difficulty-scale-quartre)    ;; Height
+            (the int (* 6.0 bh-difficulty-scale))             ;; Amount
+            (/ 0.45 bh-difficulty-scale)                       ;; Delay
+            0.0     ;; Side
+            (- 3.0 (* 0.47 bh-difficulty))                     ;; Lifetime
+            (* (meters 11.5) bh-difficulty-scale-quartre)     ;; Speed
+            (+ 50.0 (* 0.65 bh-projectile-homing))                    ;; Homing
+            )
+            (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.5)))
+          )
         )))
   0)
 
@@ -734,8 +823,8 @@
   (set! *bh-trail-count* 0)
   0)
 
-(define *bh-last-movie* #f)
 (define *bh-resume-time* 0)
+(define *bh-last-movie* #f)
 (defun bullet-hell-update ()
   (let ((m (if (-> *setting-control* current movie) #t #f)))
   (if (and m (not *bh-last-movie*))
@@ -749,6 +838,7 @@
              (>= (current-time) *bh-resume-time*))
     (bh-update-difficulty)
     (bh-trail-update)
+    (bh-circle-seq-update)
     (when (> bh-difficulty 0.0)
       (when (>= (current-time) bh-next-attack-time)
 
@@ -897,11 +987,7 @@
 (defun runs-on-jak-spawn ()
   (set! bh-difficulty-start 0.0)
   (set! bh-difficulty 0.0)
-  (set! bh-next-attack-time
-          (+ (current-time)
-            (seconds 2.0)
-          )
-        )
+
   (set! bh-difficulty-target
         (fmax 0.0
           (fmin 1.0

@@ -51,7 +51,7 @@
       ((method-of-type projectile-yellow activate)
        (the-as projectile-yellow proc) *target* 'projectile-yellow (the-as pointer #x70004000))
       ((the-as (function process function object object object object object object) run-function-in-process)
-       proc projectile-init-by-other (the-as entity-actor #f) pos vel options (the-as handle #f))
+       proc projectile-init-by-other (the-as entity-actor #f) pos vel (logior options (the-as uint 512)) (the-as handle #f))
 
       (set! (-> (the-as projectile-yellow proc) timeout)
             (the-as time-frame (seconds lifetime)))
@@ -407,6 +407,33 @@
                 (bh-spawn-bullet pos dir lifetime b-speed (the-as uint 0) (* 0.5 bh-projectile-homing) 0.25 0))))))))
   0)
 
+;; Cross of bullets at a random spot near Jak, rotated randomly.
+;; distance   = how far from Jak the cross center spawns
+;; spacing    = gap between bullets along an arm
+;; amount     = bullets per arm (total = 4 x amount)
+;; base-speed = speed of the bullet closest to the center
+;; step-speed = extra speed per bullet further out
+(defun bh-cross ((distance float) (spacing float) (amount int) (base-speed float) (step-speed float) (lifetime float) (homing float))
+  (when *target*
+    (let ((pos (new 'stack-no-clear 'vector))
+          (dir (new 'stack-no-clear 'vector))
+          (place-ang (rand-vu-float-range 0.0 65536.0))
+          (cross-ang (rand-vu-float-range 0.0 65536.0)))
+      (let ((cx (+ (-> *target* control trans x) (* (sin place-ang) distance)))
+            (cy (+ (-> *target* control trans y) (meters 1.2)))
+            (cz (+ (-> *target* control trans z) (* (cos place-ang) distance))))
+        (dotimes (arm 4)
+          (let* ((ang (+ cross-ang (* 16384.0 (the float arm))))
+                 (dx (sin ang))
+                 (dz (cos ang)))
+            (dotimes (i amount)
+              (let* ((dist (* (the float (+ i 1)) spacing))
+                     (b-speed (+ base-speed (* (the float i) step-speed))))
+                (set-vector! pos (+ cx (* dx dist)) cy (+ cz (* dz dist)) 1.0)
+                (set-vector! dir dx 0.0 dz 1.0)
+                (bh-spawn-bullet pos dir lifetime b-speed (the-as uint 0) homing 0.25 1))))))))
+  0)
+
 (define bh-pattern-unlock-amount 5)
 (defun bh-get-unlocked-patterns ()
   (+ 1
@@ -455,9 +482,9 @@
           (bh-rain
             *bh-center*
             (the int (* 3.0 bh-difficulty-scale))       ;; Amount
-            (/ (meters 20.0) bh-difficulty-scale-third)  ;; Distance Spacing
+            (/ (meters 18.0) bh-difficulty-scale-third)  ;; Distance Spacing
             (meters 14.0)                               ;; Height
-            (- 2.2 (* 0.66 bh-difficulty))              ;; Lifetime
+            (- 2.3 (* 0.6 bh-difficulty))              ;; Lifetime
             (* (meters 10.5) bh-difficulty-scale-half)       ;; Speed
             )
         )

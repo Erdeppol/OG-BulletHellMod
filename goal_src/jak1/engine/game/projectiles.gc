@@ -520,7 +520,9 @@
     (behavior ((proc process) (argc int) (message symbol) (block event-message-block))
       (case message
         (('touched)
-         (when (-> self attack-mode)
+         (when (and (-> self attack-mode)
+          (or (zero? (-> self bh-grace))
+          (time-elapsed? (-> self state-time) (-> self bh-grace))))
            (when (cond
                    ((= (-> proc type) target)
                     (send-event proc 'attack (-> block param 0) (static-attack-info ((mode (-> self attack-mode))))))
@@ -753,6 +755,9 @@
   (set! (-> this update-velocity) projectile-update-velocity-space-wars)
   (set! (-> this angle) (vector-y-angle (-> this root transv)))
   (set! (-> this tween) 0.05)
+  (set! (-> this bh-homing) 0.0)
+  (set! (-> this bh-nokill) 0)
+  (set! (-> this bh-grace) 0)
   (logior! (-> this options) 2)
   (let ((s5-0 (new 'stack-no-clear 'vector)))
     (set! (-> s5-0 quad) (-> this root trans quad))

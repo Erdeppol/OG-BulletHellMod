@@ -739,7 +739,7 @@
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 18)
+(define bh-implemented-patterns 19)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -764,7 +764,7 @@
                     bh-patterns-seen
                     (rand-vu-int-count patternCount)
                   )))
-     (set! pattern 13) ;; DEBUG
+    ;; (set! pattern 18) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -798,7 +798,7 @@
             (+ 90.0 bh-projectile-homing)                   ;; Homing
             )
           )
-        ((3)
+        ((17)
           (bh-side-pair
             (/ (meters 23.0) bh-difficulty-scale-third)     ;; Distance
             (/ (meters 8.0) bh-difficulty-scale-quartre)    ;; Height
@@ -917,7 +917,7 @@
             (the int (* 8.0 bh-difficulty-scale))            ;; Amount
             (meters 10.0)                                   ;; Lead
             (- 2.7 (* 0.6 bh-difficulty))                  ;; Lifetime
-            (* (meters 16.0) bh-difficulty-scale-quarte)     ;; Speed
+            (* (meters 16.0) bh-difficulty-scale-quartre)     ;; Speed
             (* 0.54 bh-projectile-homing)                   ;; Homing
             )
           )
@@ -960,7 +960,7 @@
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
         )
-        ((17)
+        ((3)
           (bh-ring-out
             (/ (meters 11.0) bh-difficulty-scale-third)     ;; Radius
             (the int (* 3.0 bh-difficulty-scale-lesser))      ;; Amount
@@ -971,6 +971,28 @@
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 2.0)))
         )
+        ((18)
+          (bh-ball
+            (/ (meters 35.0) bh-difficulty-scale-quartre)     ;; Distance
+            (/ (meters 15.0) bh-difficulty-scale-half)      ;; Height
+            (* (meters 2.0) bh-difficulty-scale-half)           ;; Radius
+            (the int (* 12.0 bh-difficulty-scale))            ;; Amount
+            (meters 18.0)                                   ;; Lead
+            (- 3.0 (* 0.63 bh-difficulty))                  ;; Lifetime
+            (* (meters 17.0) bh-difficulty-scale-quartre)     ;; Speed
+            (* 0.4 bh-projectile-homing)                   ;; Homing
+            )
+          (bh-ball
+            (/ (meters 35.0) bh-difficulty-scale-quartre)     ;; Distance
+            (/ (meters 15.0) bh-difficulty-scale-half)      ;; Height
+            (* (meters 2.0) bh-difficulty-scale-half)           ;; Radius
+            (the int (* 12.0 bh-difficulty-scale))            ;; Amount
+            (meters -18.0)                                   ;; Lead
+            (- 3.0 (* 0.63 bh-difficulty))                  ;; Lifetime
+            (* (meters 17.0) bh-difficulty-scale-quartre)     ;; Speed
+            (* 0.4 bh-projectile-homing)                   ;; Homing
+            )
+          )
         )))
   0)
 
@@ -1089,12 +1111,7 @@
   (bh-set-spec 2059 8 -8.0) ;; Flash fade
   0)
 
-(defun runs-every-frame ()
-  (if *show-input-display* (input-display-on) (input-display-off))
-
-  (when *debug-segment*
-    (orb-placer-maintenance))
-
+(defun debugcheator ()
   (when (cpad-pressed? 0 l1)
     (set! (-> *game-info* fuel) (fmax 0.0 (- (-> *game-info* fuel) 1.0)))
     (set! bh-difficulty
@@ -1122,7 +1139,15 @@
           (fmin 1.0 (+ bh-difficulty (/ 100.0 bh-difficulty-peak))))
     (bh-debug-difficulty)
     (bh-clear-bullets))
+)
 
+(defun runs-every-frame ()
+  (if *show-input-display* (input-display-on) (input-display-off))
+
+  (when *debug-segment*
+    (orb-placer-maintenance))
+
+  ;; (debugcheator)
   (bullet-hell-update)
   (bh-tint-particles)
 

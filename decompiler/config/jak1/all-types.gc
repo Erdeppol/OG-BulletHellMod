@@ -12901,11 +12901,13 @@
    (target-count    int32           :offset-assert 404)
    (sound-id        sound-id        :offset-assert 408)
    (bh-homing       float           :offset-assert 412)
+   (bh-nokill       int32           :offset-assert 416)
+   (bh-grace        int32           :offset-assert 420)
    )
-  :heap-base #x130
+  :heap-base #x140
   :method-count-assert 29
-  :size-assert         #x19c
-  :flag-assert         #x1d0130019c
+  :size-assert         #x1a8
+  :flag-assert         #x1d014001a8
   ;; inherited inspect of process-drawable
   (:methods
     (projectile-die () _type_ :state) ;; 20 ;; state - sound related?
@@ -12921,23 +12923,23 @@
   )
 
 (deftype projectile-yellow (projectile)
-  ((mode  int32  :offset-assert 412)
-   (angle float  :offset-assert 416)
+  ((mode  int32  :offset-assert 424)
+   (angle float  :offset-assert 428)
    )
-  :heap-base #x140
+  :heap-base #x150
   :method-count-assert 29
-  :size-assert         #x1a4
-  :flag-assert         #x1d014001a4
+  :size-assert         #x1b0
+  :flag-assert         #x1d015001b0
   )
 
 (deftype projectile-blue (projectile)
-  ((mode      int32  :offset-assert 412)
-   (joint-num int32  :offset-assert 416)
+  ((mode      int32  :offset-assert 424)
+   (joint-num int32  :offset-assert 428)
    )
-  :heap-base #x140
+  :heap-base #x150
   :method-count-assert 29
-  :size-assert         #x1a4
-  :flag-assert         #x1d014001a4
+  :size-assert         #x1b0
+  :flag-assert         #x1d015001b0
   )
 
 
@@ -31469,12 +31471,12 @@
 
 (deftype mother-spider-proj (projectile)
   ((parent-process (pointer projectile) :score 100 :offset 12)
-   (facing-dir vector :inline :offset-assert 416)
+   (facing-dir vector :inline :offset-assert 432)
    )
   :method-count-assert 29
-  :heap-base           #x140
-  :size-assert         #x1b0
-  :flag-assert         #x1d014001b0
+  :heap-base           #x150
+  :size-assert         #x1c0
+  :flag-assert         #x1d015001c0
   ;; inherited inspect of projectile
   )
 
@@ -34617,13 +34619,13 @@
 
 (declare-type ram-boss nav-enemy)
 (deftype ram-boss-proj (projectile)
-  ((parent-override (pointer ram-boss) :score 100         :offset 12)
-   (part2           sparticle-launch-control          :offset-assert 412)
-   (launched?       symbol          :offset-assert 416)
-   (growth          float          :offset-assert 420)
-   (charge-sound-id sound-id       :offset-assert 424)
-   (launch-time     time-frame         :offset-assert 432)
-   (facing-dir      vector :inline :offset-assert 448)
+  ((parent-override (pointer ram-boss) :score 100 :offset 12)
+   (part2           sparticle-launch-control :offset-assert 424)
+   (launched?       symbol          :offset-assert 428)
+   (growth          float           :offset-assert 432)
+   (charge-sound-id sound-id        :offset-assert 436)
+   (launch-time     time-frame      :offset-assert 440)
+   (facing-dir      vector :inline  :offset-assert 448)
    )
   :method-count-assert 29
   :size-assert         #x1d0

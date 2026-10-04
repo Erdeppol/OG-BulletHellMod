@@ -106,7 +106,6 @@
 (define bh-next-attack-time 0)
 (define *bh-spin* 0.0)
 (define *bh-center* (new 'global 'vector))
-
 (defun bh-rain ((center vector) (gridSize int) (spacing float) (height float) (lifetime float) (speed float))
   (let* ((pos (new 'stack-no-clear 'vector))
          (dir (new 'stack-no-clear 'vector))
@@ -536,36 +535,38 @@
     (let* ((pos (new 'stack-no-clear 'vector))
            (dir (new 'stack-no-clear 'vector))
            (facing (y-angle (-> *target* control)))
-           ;; center: random direction in front of Jak, random elevation, on a sphere of radius `distance`
            (place-ang (+ facing (rand-vu-float-range -20000.0 20000.0)))
            (place-elev (rand-vu-float-range -4000.0 12000.0))
            (flat (* (cos place-elev) distance))
            (cx (+ (-> *target* control trans x) (* (sin place-ang) flat)))
            (cy (+ (-> *target* control trans y) (meters 1.2) (* (sin place-elev) distance)))
            (cz (+ (-> *target* control trans z) (* (cos place-ang) flat)))
-           ;; cross orientation: random axis u in 3D
+           ;; axis u
            (a1 (rand-vu-float-range 0.0 65536.0))
            (e1 (rand-vu-float-range -16384.0 16384.0))
            (ux (* (cos e1) (sin a1)))
            (uy (sin e1))
            (uz (* (cos e1) (cos a1)))
-           ;; h = horizontal vector perpendicular to u
+           ;; h, p, v 
            (hx (cos a1))
            (hz (- (sin a1)))
-           ;; p = u x h
            (px (* uy hz))
            (py (- (* uz hx) (* ux hz)))
            (pz (- (* uy hx)))
-           ;; v = rotate h toward p by a random angle, so v is perpendicular to u
            (t1 (rand-vu-float-range 0.0 65536.0))
            (vx (+ (* (cos t1) hx) (* (sin t1) px)))
            (vy (* (sin t1) py))
-           (vz (+ (* (cos t1) hz) (* (sin t1) pz))))
-      (dotimes (arm 4)
-        (let* ((s (if (< arm 2) 1.0 -1.0))
-               (dx (* s (if (zero? (logand arm 1)) ux vx)))
-               (dy (* s (if (zero? (logand arm 1)) uy vy)))
-               (dz (* s (if (zero? (logand arm 1)) uz vz))))
+           (vz (+ (* (cos t1) hz) (* (sin t1) pz)))
+           ;; third axis w = u x v
+           (wx (- (* uy vz) (* uz vy)))
+           (wy (- (* uz vx) (* ux vz)))
+           (wz (- (* ux vy) (* uy vx))))
+      (dotimes (arm 6)
+        (let* ((axis (/ arm 2))
+               (s (if (zero? (logand arm 1)) 1.0 -1.0))
+               (dx (* s (cond ((= axis 0) ux) ((= axis 1) vx) (else wx))))
+               (dy (* s (cond ((= axis 0) uy) ((= axis 1) vy) (else wy))))
+               (dz (* s (cond ((= axis 0) uz) ((= axis 1) vz) (else wz)))))
           (dotimes (i amount)
             (let* ((dist (* (the float (+ i 1)) spacing))
                    (b-speed (+ base-speed (* (the float i) step-speed))))
@@ -779,14 +780,14 @@
             (* (meters 10.5) bh-difficulty-scale)       ;; Speed
           )
         )
-        ((1)
+        ((0)
           (bh-rain
             *bh-center*
             (the int (* 3.0 bh-difficulty-scale))       ;; Amount
-            (/ (meters 18.0) bh-difficulty-scale-third)  ;; Distance Spacing
+            (/ (meters 20.0) bh-difficulty-scale-third)  ;; Distance Spacing
             (meters 14.0)                               ;; Height
-            (- 2.4 (* 0.5 bh-difficulty))              ;; Lifetime
-            (* (meters 9.5) bh-difficulty-scale-quartre)       ;; Speed
+            (- 2.7 (* 0.5 bh-difficulty))              ;; Lifetime
+            (* (meters 9.0) bh-difficulty-scale-quartre)       ;; Speed
             )
         )
         ((2)
@@ -853,14 +854,14 @@
             (* (meters 4.0) bh-difficulty-scale-third)     ;; speed Step subtracting
             )     
         )
-        ((0)
+        ((1)
           (bh-cross
             (/ (meters 20.0) bh-difficulty-scale-quartre)     ;; Distance
             (/ (meters 0.5) bh-difficulty-scale-third)        ;; Spacing
             (the int (* 3.0 bh-difficulty-scale-quartre))       ;; Amount
             (* (meters 3.0) bh-difficulty-scale-half)        ;; Base Speed
-            (* (meters 5.0) bh-difficulty-scale-half)         ;; Step Speed adding
-            (- 3.0 (* 0.5 bh-difficulty))                     ;; Lifetime
+            (* (meters 4.0) bh-difficulty-scale-half)         ;; Step Speed adding
+            (- 4.0 (* 0.5 bh-difficulty))                     ;; Lifetime
             (+ 10.0 (* bh-projectile-homing 0.33))            ;; Homing
             )
         )
@@ -1205,9 +1206,10 @@
   (none))
 
 (defun runs-on-jak-spawn ()
+  (set! *bh-resume-time* (+ (current-time) (seconds 2.0)))
   (set! bh-difficulty-start 0.0)
   (set! bh-difficulty 0.0)
-
+  (bh-clear-bullets)
   (set! bh-difficulty-target
         (fmax 0.0
           (fmin 1.0

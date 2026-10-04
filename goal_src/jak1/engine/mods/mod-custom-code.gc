@@ -153,6 +153,55 @@
       (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 0)))
   0)
 
+  ;; radius = size of the ball, count = number of bullets in it
+  ;; lead = how far ahead of Jak the bullets aim (0 = right at him)
+  (defun bh-ball ((distance float) (height float) (radius float) (count int) (lead float) (lifetime float) (speed float) (homing float))
+  (when *target*
+    (let ((center (new 'stack-no-clear 'vector))
+          (pos    (new 'stack-no-clear 'vector))
+          (fwd    (new 'stack-no-clear 'vector))
+          (dir    (new 'stack-no-clear 'vector))
+          (move   (new 'stack-no-clear 'vector))
+          (aim    (new 'stack-no-clear 'vector))
+          (twist  (rand-vu-float-range 0.0 65536.0)))
+
+      ;; Camera forward direction, flattened
+      (set! (-> fwd quad) (-> *math-camera* inv-camera-rot vector 2 quad))
+      (set! (-> fwd y) 0.0)
+      (vector-normalize! fwd 1.0)
+
+      ;; Ball center in front of the camera, above Jak
+      (vector+*! center (-> *target* control trans) fwd distance)
+      (+! (-> center y) height)
+
+      ;; Jak's horizontal movement direction, or his facing if standing still
+      (set! (-> move quad) (-> *target* control transv quad))
+      (set! (-> move y) 0.0)
+      (if (< (vector-length move) (meters 0.5))
+        (vector-z-quaternion! move (-> *target* control quat)))
+      (vector-normalize! move 1.0)
+
+      ;; Aim point = Jak + movement direction * lead
+      (vector+*! aim (-> *target* control trans) move lead)
+
+      ;; One shared direction: toward the aim point
+      (vector-! dir aim center)
+      (vector-normalize! dir 1.0)
+
+      ;; Fibonacci sphere: evenly spaced points on the surface
+      (dotimes (i count)
+        (let* ((sy (- 1.0 (* 2.0 (/ (+ (the float i) 0.5) (the float count)))))
+               (sr (sqrtf (- 1.0 (* sy sy))))
+               ;; 25032.74 = golden angle (137.5 degrees) in game rotation units
+               (th (+ twist (* 25032.74 (the float i)))))
+          (set-vector! pos
+                       (+ (-> center x) (* radius sr (cos th)))
+                       (+ (-> center y) (* radius sy))
+                       (+ (-> center z) (* radius sr (sin th)))
+                       1.0)
+          (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 0)))))
+  0)
+
 (defun bh-side-pair ((distance float) (height float) (sideDistance float) (lifetime float) (speed float) (homing float))
   (when *target*
     (let ((pos (new 'stack-no-clear 'vector))
@@ -411,18 +460,27 @@
     (let* ((a (* (/ 65536.0 (the float *bh-circs-amount*)) (the float *bh-circs-index*)))
            (c (cos a))
            (s (sin a))
-           ;; first-bullet direction rotated by a around the vertical axis
            (dx (+ (* *bh-circs-bx* c) (* *bh-circs-spin* *bh-circs-bz* s)))
            (dz (- (* *bh-circs-bz* c) (* *bh-circs-spin* *bh-circs-bx* s)))
            (pos (new 'stack-no-clear 'vector))
+           (fwd (new 'stack-no-clear 'vector))
+           (aim (new 'stack-no-clear 'vector))
            (dir (new 'stack-no-clear 'vector)))
       (set-vector! pos
                    (+ (-> *target* control trans x) (* dx *bh-circs-radius*))
                    (+ (-> *target* control trans y) *bh-circs-height*)
                    (+ (-> *target* control trans z) (* dz *bh-circs-radius*))
                    1.0)
-      ;; start out pointing at Jak; homing takes over from there
-      (set-vector! dir (- dx) 0.0 (- dz) 1.0)
+      ;; aim point = Jak + his facing direction * lead
+      (vector-z-quaternion! fwd (-> *target* control quat))
+      (vector+*! aim (-> *target* control trans) fwd (meters 6.0))   ;; <- lead distance
+      ;; horizontal direction from the bullet to the aim point
+      (set-vector! dir
+                   (- (-> aim x) (-> pos x))
+                   0.0
+                   (- (-> aim z) (-> pos z))
+                   1.0)
+      (vector-normalize! dir 1.0)
       (bh-spawn-bullet pos dir *bh-circs-lifetime* *bh-circs-speed* (the-as uint 0) *bh-circs-homing* 0.25 0)
       (+! *bh-circs-index* 1)
       (set! *bh-circs-next* (the-as int (+ (current-time) *bh-circs-delay*)))
@@ -606,7 +664,7 @@
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 13)
+(define bh-implemented-patterns 14)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -631,7 +689,7 @@
                     bh-patterns-seen
                     (rand-vu-int-count patternCount)
                   )))
-    (set! pattern 12) ;; DEBUG
+    (set! pattern 13) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -771,10 +829,22 @@
             (/ 0.45 bh-difficulty-scale)                       ;; Delay
             0.0     ;; Side
             (- 3.0 (* 0.47 bh-difficulty))                     ;; Lifetime
-            (* (meters 11.5) bh-difficulty-scale-quartre)     ;; Speed
-            (+ 50.0 (* 0.65 bh-projectile-homing))                    ;; Homing
+            (* (meters 11.4) bh-difficulty-scale-quartre)     ;; Speed
+            (+ 50.0 (* 0.6 bh-projectile-homing))                    ;; Homing
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.5)))
+          )
+        ((13)
+          (bh-ball
+            (/ (meters 34.0) bh-difficulty-scale-quartre)     ;; Distance
+            (/ (meters 15.0) bh-difficulty-scale-half)      ;; Height
+            (* (meters 1.0) bh-difficulty-scale-half)           ;; Radius
+            (the int (* 8.0 bh-difficulty-scale))            ;; Amount
+            (meters 10.0)                                   ;; Lead
+            (- 2.7 (* 0.6 bh-difficulty))                  ;; Lifetime
+            (* (meters 16.0) bh-difficulty-scale-third)     ;; Speed
+            (* 0.5 bh-projectile-homing)                   ;; Homing
+            )
           )
         )))
   0)

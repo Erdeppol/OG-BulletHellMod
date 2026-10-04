@@ -643,7 +643,8 @@
                      :to
                      *entity-pool*)
       (if (nonzero? (-> self sound-id)) (sound-stop (-> self sound-id)))
-      (sound-play "yellow-explode")
+      (if (zero? (logand (-> self options) 512))
+        (sound-play "yellow-explode"))
       (suspend)
       (go-virtual projectile-die)))
 
@@ -663,7 +664,8 @@
                      :to
                      *entity-pool*)
       (if (nonzero? (-> self sound-id)) (sound-stop (-> self sound-id)))
-      (sound-play "yellow-fizzle")
+      (if (zero? (logand (-> self options) 512))
+        (sound-play "yellow-fizzle"))
       (suspend)
       (go-virtual projectile-die)))
 
@@ -769,8 +771,9 @@
       (if (logtest? (-> this options) 16) (set! (-> this max-hits) 1))
       (set! (-> *part-id-table* 356 init-specs 18 initial-valuef) (the float (sar (shl (the int (+ -16384.0 f30-0)) 48) 48)))
       (set! (-> *part-id-table* 358 init-specs 11 initial-valuef) (the float (sar (shl (the int (+ -16384.0 f30-0)) 48) 48)))
-      (sound-play "yellow-fire")
-      (set! (-> this sound-id) (sound-play "yellow-buzz"))
+      (when (not (logtest? (-> this options) 512))
+        (sound-play "yellow-fire")
+        (set! (-> this sound-id) (sound-play "yellow-buzz")))
       (if (not (logtest? (-> this options) 416))
         (process-spawn part-tracker :init part-tracker-init group-part-yellow-eco-fireball-launcher -1 #f #f #f s5-0 :to this))
       (set! (-> *part-id-table* 350 init-specs 2 initial-valuef) f30-0)))
@@ -825,6 +828,7 @@
            0)
          (spawn (-> this part) (-> this root root-prim prim-core world-sphere))))
       (else (spawn (-> this part) (-> this root root-prim prim-core world-sphere))))
+    (when (nonzero? (-> this sound-id))
     (let ((s5-0 (the-as sound-rpc-set-param (get-sound-buffer-entry))))
       (set! (-> s5-0 command) (sound-command set-param))
       (set! (-> s5-0 id) (-> this sound-id))
@@ -836,7 +840,7 @@
               (set! a1-3 (the-as vector #f)))))
         (sound-trans-convert (-> s5-0 parms trans) a1-3))
       (set! (-> s5-0 parms mask) (sound-mask trans))
-      (-> s5-0 id))
+      (-> s5-0 id)))
     0
     (none)))
 

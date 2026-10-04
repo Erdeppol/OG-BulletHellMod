@@ -71,6 +71,7 @@
       ;; (set! (-> (the-as projectile-yellow proc) max-turn) 0.0)
       (set! (-> (the-as projectile-yellow proc) bh-homing) homing)
       (set! (-> (the-as projectile-yellow proc) bh-nokill) lowSpeedNoKill)
+      (set! (-> (the-as projectile-yellow proc) bh-grace) (the-as int (seconds 0.2)))
       (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target)))
       
       (set! (-> *bh-handles* *bh-handle-idx*) (the-as uint64 (process->handle proc)))
@@ -363,12 +364,55 @@
       (set! *bh-trail-active* #f)))
   0)
 
+;; Four walls around the center, each moving along its own side (clockwise).
+;; half-size = distance from center to each wall, count = bullets per wall,
+;; inward = 0.0 pure train, >0 drifts toward the center so walls close in.
+;; rows = number of rows per wall, row-gap = distance between rows
+(defun bh-train ((count int) (spacing float) (rows int) (half-size float) (inward float) (lifetime float) (speed float) (speed-step float))
+  (let ((pos (new 'stack-no-clear 'vector))
+        (dir (new 'stack-no-clear 'vector))
+        (row-gap (meters 3.5))
+        (backDistance (meters 5.0))
+        (mid (/ (the float (- count 1)) 2.0))
+        ;; Jak's facing angle, captured once when the pattern spawns
+        (facing (if *target* (y-angle (-> *target* control)) 0.0)))
+    (dotimes (side 4)
+      (let* ((ang (+ facing 8192.0 (* 16384.0 (the float side))))
+             (nx (sin ang))
+             (nz (cos ang))
+             (tx nz)
+             (tz (- nx)))
+        (dotimes (r rows)
+          (let ((height (+ (meters 1.2) (* (the float r) row-gap))))
+            (dotimes (i count)
+              (let* ((along (* (- (the float i) mid) spacing))
+                     (behind (the float (- (- count 1) i)))
+                     (raw-speed (- speed (* behind speed-step)))
+                     (b-speed (if (< raw-speed (meters 0.5)) (meters 0.5) raw-speed)))
+                (set-vector! pos
+                  (+ (-> *bh-center* x)
+                     (* nx (+ half-size backDistance))
+                     (* tx along))
+                  (+ (-> *bh-center* y) height)
+                  (+ (-> *bh-center* z)
+                     (* nz (+ half-size backDistance))
+                     (* tz along))
+                  1.0)
+                (set-vector! dir
+                             (- tx (* nx inward))
+                             0.0
+                             (- tz (* nz inward))
+                             1.0)
+                (vector-normalize! dir 1.0)
+                (bh-spawn-bullet pos dir lifetime b-speed (the-as uint 0) (* 0.5 bh-projectile-homing) 0.25 0))))))))
+  0)
+
 (define bh-pattern-unlock-amount 5)
 (defun bh-get-unlocked-patterns ()
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 3)
+(define bh-implemented-patterns 8)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -391,7 +435,7 @@
     (let* ((patternCount (min (bh-get-unlocked-patterns) bh-implemented-patterns))
        (pattern (if (< bh-patterns-seen patternCount)
                     bh-patterns-seen
-                    6 ;; (rand-vu-int-count patternCount)
+                    1 ;; (rand-vu-int-count patternCount)
                   )))
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
@@ -403,7 +447,7 @@
             (the int (* 3.0 bh-difficulty-scale))       ;; Amount
             *bh-spin*
             (/ (meters 18.0) bh-difficulty-scale-half)  ;; Distance
-            (- 2.0 (* 0.65 bh-difficulty))                 ;; Lifetime
+            (- 2.2 (* 0.65 bh-difficulty))                 ;; Lifetime
             (* (meters 10.0) bh-difficulty-scale)       ;; Speed
           )
         )
@@ -411,10 +455,10 @@
           (bh-rain
             *bh-center*
             (the int (* 3.0 bh-difficulty-scale))       ;; Amount
-            (/ (meters 18.0) bh-difficulty-scale-half)  ;; Distance Spacing
+            (/ (meters 20.0) bh-difficulty-scale-third)  ;; Distance Spacing
             (meters 14.0)                               ;; Height
-            (- 2.0 (* 0.66 bh-difficulty))              ;; Lifetime
-            (* (meters 10.6) bh-difficulty-scale-half)       ;; Speed
+            (- 2.2 (* 0.66 bh-difficulty))              ;; Lifetime
+            (* (meters 10.5) bh-difficulty-scale-half)       ;; Speed
             )
         )
         ((2)
@@ -467,6 +511,18 @@
             (* (meters 4.4) bh-difficulty-scale-lesser)              ;; Speed
             (+ 20.0 (* bh-projectile-homing))                 ;; Homing
             )
+        )
+        ((7)
+          (bh-train
+            (+ 2 (min 1 (the int (* 2.0 bh-difficulty))))           ;; bullets per row
+            (/ (meters 6.0) bh-difficulty-scale)         ;; Spacing in wall
+            (+ 2 (min 1 (the int (* 2.0 bh-difficulty))))         ;; rows per wall (2 to 3)
+            (/ (meters 10.0) bh-difficulty-scale-half)       ;; distance of walls from Jak
+            (+ 1.0 (* 0.25 bh-difficulty))                 ;; inward drift
+            (- 2.5 (* 0.6 bh-difficulty))                  ;; lifetime
+            (* (meters 16.0) bh-difficulty-scale-third)     ;; speed
+            (* (meters 7.0) bh-difficulty-scale-third)     ;; speed Step
+            )     
         )
         )))
   0)

@@ -34,7 +34,7 @@
    (sound-id        sound-id)
    (bh-homing       float)
    (bh-nokill       int32)
-   (bh-grace       int32))
+   (bh-grace        int32))
   (:state-methods
    projectile-die
    projectile-dissipate

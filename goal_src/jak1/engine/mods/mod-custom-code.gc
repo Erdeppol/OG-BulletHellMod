@@ -764,7 +764,7 @@
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 23)
+(define bh-implemented-patterns 25)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -790,7 +790,7 @@
                     bh-patterns-seen
                     (rand-vu-int-count patternCount)
                   )))
-     (set! pattern 22) ;; DEBUG
+     ;;(set! pattern 23) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -1070,6 +1070,42 @@
             )
           )
         ((22)
+          (bh-wall
+            (the int (* 8.0 bh-difficulty-scale-half))        ;; Columns
+            (/ (meters 2.5) bh-difficulty-scale-quartre)      ;; Spacing
+            (the int (* 5.0 bh-difficulty-scale-quartre))     ;; Rows
+            (meters 2.0)                                      ;; Row gap
+            (- (meters 1.0) bh-difficulty)                    ;; height
+            1                                                 ;; group >= 1 gap decider
+            1                                                 ;; Gap
+            (* (meters 13.0) bh-difficulty-scale-half)     ;; Speed
+            )
+            (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.5)))
+        )
+        ((23)
+          (bh-wall
+            (the int (* 9.0 bh-difficulty-scale-half))        ;; Columns
+            (/ (meters 2.8) bh-difficulty-scale-quartre)      ;; Spacing
+            1                                                 ;; Rows
+            (meters 2.0)                                      ;; Row gap
+            (meters 6.0)                                      ;; height
+            1                                                 ;; group >= 1 gap decider
+            0                                                 ;; Gap
+            (* (meters 15.0) bh-difficulty-scale-half)     ;; Speed
+            )
+          (bh-wall
+            (the int (* 7.0 bh-difficulty-scale-half))        ;; Columns
+            (/ (meters 2.8) bh-difficulty-scale-quartre)      ;; Spacing
+            1                                                 ;; Rows
+            (meters 2.0)                                      ;; Row gap
+            (meters 6.5)                                      ;; height
+            1                                                 ;; group >= 1 gap decider
+            0                                                 ;; Gap
+            (* (meters 13.0) bh-difficulty-scale-half)     ;; Speed
+            )
+            (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.5)))
+        )
+        ((24)
           (bh-ball
             (meters 35.0)     ;; Distance
             (/ (meters 19.0) bh-difficulty-scale-half)      ;; Height

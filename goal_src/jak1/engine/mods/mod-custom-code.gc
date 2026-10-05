@@ -34,6 +34,8 @@
 (define bh-difficulty-target 0.0)
 (define bh-difficulty-time 0.0)
 (define bh-difficulty-peak 80.0)
+(define bh-difficulty-heal-start 0.15)
+(define bh-difficulty-heal-stop 0.95)
 (define bh-projectile-homing 0.0)
 (define *bh-handles* (new 'global 'boxed-array uint64 512))
 (define *bh-handle-idx* 0)
@@ -162,6 +164,7 @@
         (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 1))))
   0)  
 
+(define bh-next-heal-time 0)
 (define bh-next-attack-time 0)
 (define *bh-spin* 0.0)
 (define *bh-center* (new 'global 'vector))
@@ -793,13 +796,12 @@
             (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) (* 0.25 bh-projectile-homing) 0.25 1))))))
   0)
 
-
 (define bh-pattern-unlock-amount 3)
 (defun bh-get-unlocked-patterns ()
   (+ 1
      (/ bh-power-cells bh-pattern-unlock-amount)))
 (define bh-patterns-seen 0)
-(define bh-implemented-patterns 25)
+(define bh-implemented-patterns 26)
 (defun bh-spawn-pattern ()
   (when *target*
     (vector-z-quaternion!
@@ -831,7 +833,7 @@
                     bh-patterns-seen
                     (rand-vu-int-count patternCount)
                   )))
-     ;;(set! pattern 23) ;; DEBUG
+     (set! pattern 23) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -841,7 +843,7 @@
             *bh-center*
             (the int (* 3.0 bh-difficulty-scale))       ;; Amount
             *bh-spin*
-            (/ (meters 25.0) bh-difficulty-scale-half)  ;; Distance
+            (/ (meters 26.0) bh-difficulty-scale-half)  ;; Distance
             (- 2.3 (* 0.65 bh-difficulty-eff))                 ;; Lifetime
             (* (meters 10.5) bh-difficulty-scale)       ;; Speed
           )
@@ -892,10 +894,11 @@
             *bh-center*
             (the int (* 3.0 bh-difficulty-scale-third))      ;; Amount
             (/ (meters 12.0) bh-difficulty-scale-quartre)    ;; Distance
-            (- 2.0 (* 0.5 bh-difficulty-eff))                    ;; Lifetime
+            (- 2.6 (* 0.5 bh-difficulty-eff))                    ;; Lifetime
             (* (meters 1.0) bh-difficulty-scale-half)        ;; Speed
             (+ 10.0 (* bh-projectile-homing 0.25))           ;; Homing
             )
+          (set! bh-next-attack-time (+ bh-next-attack-time (seconds 0.75)))
         )
         ((6)
           (bh-trail-start
@@ -1069,7 +1072,7 @@
             *bh-center*
             (the int (* 7.0 bh-difficulty-scale-half))       ;; Amount
             *bh-spin*
-            (/ (meters 16.0) bh-difficulty-scale-third)  ;; Distance
+            (/ (meters 16.5) bh-difficulty-scale-third)  ;; Distance
             (- 2.7 (* 0.65 bh-difficulty-eff))                 ;; Lifetime
             (meters (* 1.0 bh-difficulty-scale))       ;; Speed
           )
@@ -1124,6 +1127,17 @@
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.5)))
         )
         ((23)
+          (bh-box
+            *bh-center*
+            (the int (* 3.0 bh-difficulty-scale-third))      ;; Amount
+            (/ (meters 16.5) bh-difficulty-scale-quartre)    ;; Distance
+            (- 5.0 (* 0.5 bh-difficulty-eff))                    ;; Lifetime
+            (* (meters 2.0) bh-difficulty-scale-lesser)        ;; Speed
+            (+ 20.0 (* bh-projectile-homing 0.3))           ;; Homing
+            )
+          (set! bh-next-attack-time (+ bh-next-attack-time (seconds 5.25)))
+        )
+        ((24)
           (bh-wall
             (the int (* 9.0 bh-difficulty-scale-half))        ;; Columns
             (/ (meters 2.8) bh-difficulty-scale-quartre)      ;; Spacing
@@ -1146,7 +1160,7 @@
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.5)))
         )
-        ((24)
+        ((25)
           (bh-ball
             (meters 35.0)     ;; Distance
             (/ (meters 19.0) bh-difficulty-scale-half)      ;; Height
@@ -1210,6 +1224,78 @@
   (bh-clear-bullets)
 0)
 
+(define bh-base-heal-rate 13.0)
+(define bh-base-heal-low-health-multiply 0.66)
+(define bh-heal-rate bh-base-heal-rate)
+(defun bh-spawn-heal ()
+  (set! bh-heal-rate bh-base-heal-rate)
+  (when (and *target* (not (bh-on-zoomer?)) (> bh-difficulty bh-difficulty-heal-start) (< bh-difficulty bh-difficulty-heal-stop))
+    (let (
+      (health (-> *target* fact health))
+      (max-health (-> *target* fact health-max))
+      )
+      (when (< health max-health)
+        (let ((missing-health (- max-health health)))
+          (set! bh-heal-rate (/ bh-base-heal-rate (+ 1.0 (* 0.5 bh-difficulty))))
+          (when (>= missing-health 2)
+            (set! bh-heal-rate (* bh-base-heal-low-health-multiply (/ bh-base-heal-rate (+ 1.0 (* 0.5 bh-difficulty)))))
+            )
+          (let (;;(basePos (new 'stack-no-clear 'vector))
+                (pos (new 'stack-no-clear 'vector))
+                (fwd (new 'stack-no-clear 'vector))
+                (right (new 'stack-no-clear 'vector))
+          )
+          ;;(set! (-> basePos quad) (-> *target* control trans quad))
+          ;;(set! (-> pos quad) (-> basePos quad))
+          ;; Camera forward direction in world space.
+          (set! (-> fwd quad) (-> *math-camera* inv-camera-rot vector 2 quad))
+          ; Flatten to the ground plane.
+          (set! (-> fwd y) 0.0)
+          (vector-normalize! fwd 1.0)
+          ;; Camera right direction.
+          (set-vector!
+            right
+            (-> fwd z)
+            0.0
+            (- (-> fwd x))
+            0.0)
+          (vector-normalize! right 1.0)
+
+            ;; (let ((angle (rand-vu-float-range 0.0 65536.0))
+            ;;        (distance (rand-vu-float-range 3.0 12.0)))
+
+
+          ;; Start in front of Jak.
+          (vector+*! pos
+            (-> *target* control trans)
+            fwd
+            (meters (rand-vu-float-range 6.0 16.0)))
+
+          ;; Random horizontal position within the visible area.
+          (vector+*! pos
+            pos
+            right
+            (meters (rand-vu-float-range -16.0 16.0)))
+
+          ;; Small random variation forward/backward.
+          (vector+*! pos pos fwd (meters (rand-vu-float-range -2.0 2.0)))
+
+            ;; (+! (-> pos x) (* (meters distance) (cos angle)))
+            ;; (+! (-> pos z) (* (meters distance) (sin angle)))
+            (+! (-> pos y) (meters 2.0))
+            (birth-pickup-at-point
+              pos
+              (pickup-type eco-pill)
+              10.0
+              #t
+              *entity-pool*
+              (the-as fact-info #f)))
+          )
+        )
+      )
+    )
+  0)
+
 (define *bh-resume-time* 0)
 (define *bh-last-movie* #t)
 (defun bullet-hell-update ()
@@ -1237,6 +1323,12 @@
     (bh-circle-seq-update)
     (when (> bh-difficulty 0.0)
       (when (>= (current-time) bh-next-attack-time)
+         (when (>= (current-time) bh-next-heal-time)
+            (bh-spawn-heal)
+            (set! bh-next-heal-time
+              (+ (current-time) (seconds bh-heal-rate)))
+              (format #t "HEAL in: ~f Seconds" bh-heal-rate)
+            )
 
         (bh-spawn-pattern)
 
@@ -1291,20 +1383,21 @@
   0)
 
 (defun debugcheator ()
+  (when *debug-segment*
+    (when (cpad-pressed? 0 l3)
+      (set! (-> *game-info* fuel) (fmax 0.0 (- (-> *game-info* fuel) 1.0)))
+      (set! bh-difficulty
+            (fmax 0.0 (- bh-difficulty (/ 10.0 bh-difficulty-peak))))
+      (bh-debug-difficulty)
+      (bh-clear-bullets))
 
-  (when (cpad-pressed? 0 l3)
-    (set! (-> *game-info* fuel) (fmax 0.0 (- (-> *game-info* fuel) 100.0)))
-    (set! bh-difficulty
-          (fmax 0.0 (- bh-difficulty (/ 100.0 bh-difficulty-peak))))
-    (bh-debug-difficulty)
-    (bh-clear-bullets))
-
-  (when (cpad-pressed? 0 r3)
-    (set! (-> *game-info* fuel) (+ (-> *game-info* fuel) 100.0))
-    (set! bh-difficulty
-          (fmin 1.0 (+ bh-difficulty (/ 100.0 bh-difficulty-peak))))
-    (bh-debug-difficulty)
-    (bh-clear-bullets))
+    (when (cpad-pressed? 0 r3)
+      (set! (-> *game-info* fuel) (+ (-> *game-info* fuel) 1.0))
+      (set! bh-difficulty
+            (fmin 1.0 (+ bh-difficulty (/ 10.0 bh-difficulty-peak))))
+      (bh-debug-difficulty)
+      (bh-clear-bullets))
+  )
 )
 
 (defun runs-every-frame ()
@@ -1389,6 +1482,7 @@
 (defun runs-on-jak-death ((death-event symbol))
   (case death-event
     (('dying)
+      (bh-clear-bullets)
      ;; Code here runs immediately every time jak dies, before any death animation or death cutscene
      )
     (('blackout)

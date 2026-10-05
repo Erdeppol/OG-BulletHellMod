@@ -36,22 +36,47 @@
 (define bh-projectile-homing 0.0)
 (define *bh-handles* (new 'global 'boxed-array uint64 512))
 (define *bh-handle-idx* 0)
+(define *bh-last-transition* #f)
+
+(defun bh-on-zoomer? ()
+  (and *target*
+       (let ((s (-> *target* state name)))
+         (or (= s 'target-racing)
+             (= s 'target-racing-jump)
+             (= s 'target-racing-falling)
+             (= s 'target-racing-get-on)
+             (= s 'target-racing-get-off)))))
+(defun bh-zoomer-transition? ()
+  (and *target*
+       (let ((s (-> *target* state name)))
+         (or (= s 'target-racing-get-on)
+             (= s 'target-racing-get-off)))))
 
 ;; spawn one bullet that can hurt Jak
 (defun bh-spawn-bullet ((pos vector) (dir vector) (lifetime float) (speed float) (options uint) (homing float) (bulletSize float) (lowSpeedNoKill int))
 
   (let ((vel (new 'stack-no-clear 'vector))
-
+        (p (new 'stack-no-clear 'vector))
+        (fwd (new 'stack-no-clear 'vector))
         (proc (get-process *default-dead-pool* projectile-yellow #x4000)))
 
     (vector-float*! vel dir speed)
+    (set! (-> p quad) (-> pos quad))
+    (when (bh-on-zoomer?)
+      ;; Jak's horizontal movement direction, or his facing if he's stopped
+      (set! (-> fwd quad) (-> *target* control transv quad))
+      (set! (-> fwd y) 0.0)
+      (if (< (vector-length fwd) (meters 0.5))
+        (vector-z-quaternion! fwd (-> *target* control quat)))
+      (vector-normalize! fwd 1.0)
+      (vector+*! p p fwd (meters 40.0)))
 
     (when proc
 
       ((method-of-type projectile-yellow activate)
        (the-as projectile-yellow proc) *target* 'projectile-yellow (the-as pointer #x70004000))
       ((the-as (function process function object object object object object object) run-function-in-process)
-       proc projectile-init-by-other (the-as entity-actor #f) pos vel (logior options (the-as uint 512)) (the-as handle #f))
+       proc projectile-init-by-other (the-as entity-actor #f) p vel (logior options (the-as uint 512)) (the-as handle #f))
 
       (set! (-> (the-as projectile-yellow proc) timeout)
             (the-as time-frame (seconds lifetime)))
@@ -1169,14 +1194,23 @@
 0)
 
 (define *bh-resume-time* 0)
-(define *bh-last-movie* #f)
+(define *bh-last-movie* #t)
 (defun bullet-hell-update ()
+  ;; Movie no spam
   (let ((m (if (-> *setting-control* current movie) #t #f)))
   (if (and m (not *bh-last-movie*))
     (bh-clear-bullets))
   (if (and (not m) *bh-last-movie*)
     (set! *bh-resume-time* (+ (current-time) (seconds 2.0))))
   (set! *bh-last-movie* m))
+
+  ;;Getting on/off bike no spam
+  (let ((tr (if (bh-zoomer-transition?) #t #f)))
+  (when tr
+    (if (not *bh-last-transition*)
+      (bh-clear-bullets))
+    (set! *bh-resume-time* (the-as int (+ (current-time) (seconds 1.0)))))
+  (set! *bh-last-transition* tr))
 
   (when (and *target*
              (not *bh-last-movie*)
@@ -1240,28 +1274,15 @@
   0)
 
 (defun debugcheator ()
-  (when (cpad-pressed? 0 l1)
-    (set! (-> *game-info* fuel) (fmax 0.0 (- (-> *game-info* fuel) 1.0)))
-    (set! bh-difficulty
-          (fmax 0.0 (- bh-difficulty (/ 1.0 bh-difficulty-peak))))
-    (bh-debug-difficulty)
-    (bh-clear-bullets))
 
-  (when (cpad-pressed? 0 r1)
-    (set! (-> *game-info* fuel) (+ (-> *game-info* fuel) 1.0))
-    (set! bh-difficulty
-          (fmin 1.0 (+ bh-difficulty (/ 1.0 bh-difficulty-peak))))
-    (bh-debug-difficulty)
-    (bh-clear-bullets))
-
-  (when (cpad-pressed? 0 l2)
+  (when (cpad-pressed? 0 l3)
     (set! (-> *game-info* fuel) (fmax 0.0 (- (-> *game-info* fuel) 100.0)))
     (set! bh-difficulty
           (fmax 0.0 (- bh-difficulty (/ 100.0 bh-difficulty-peak))))
     (bh-debug-difficulty)
     (bh-clear-bullets))
 
-  (when (cpad-pressed? 0 r2)
+  (when (cpad-pressed? 0 r3)
     (set! (-> *game-info* fuel) (+ (-> *game-info* fuel) 100.0))
     (set! bh-difficulty
           (fmin 1.0 (+ bh-difficulty (/ 100.0 bh-difficulty-peak))))
@@ -1271,11 +1292,11 @@
 
 (defun runs-every-frame ()
   (if *show-input-display* (input-display-on) (input-display-off))
-
+  
   (when *debug-segment*
     (orb-placer-maintenance))
 
-  ;; (debugcheator)
+  ;;(debugcheator)
   (bullet-hell-update)
   (bh-tint-particles)
 

@@ -1275,7 +1275,7 @@
   (when *debug-segment*
     (orb-placer-maintenance))
 
-  (debugcheator)
+  ;; (debugcheator)
   (bullet-hell-update)
   (bh-tint-particles)
 

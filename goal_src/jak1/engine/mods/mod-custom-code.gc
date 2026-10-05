@@ -780,7 +780,6 @@
     (set! bh-difficulty-scale-half (+ 1.0 (* 0.5 bh-difficulty)))
     (set! bh-difficulty-scale-third (+ 1.0 (* 0.33 bh-difficulty)))
     (set! bh-difficulty-scale-quartre (+ 1.0 (* 0.25 bh-difficulty)))
-    (set! bh-difficulty-scale-mini (+ 1.0 (* 0.125 bh-difficulty)))
     (set! bh-difficulty-scale-lesser (+ 1.0 (* 0.75 bh-difficulty)))
     (set! bh-projectile-homing (+ 0.01 (* 60.0 bh-difficulty)))
 

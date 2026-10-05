@@ -23,6 +23,7 @@
 
 (define bh-power-cells 0)
 (define bh-difficulty 0.0)
+(define bh-difficulty-eff 0.0)
 (define bh-difficulty-scale 1.0)
 (define bh-difficulty-scale-higher 1.0)
 (define bh-difficulty-scale-half 1.0)
@@ -66,10 +67,19 @@
       ;; Jak's horizontal movement direction, or his facing if he's stopped
       (set! (-> fwd quad) (-> *target* control transv quad))
       (set! (-> fwd y) 0.0)
+      (set! bulletSize (* 0.33 bulletSize))
+      (set! homing (* 0.33 homing))
       (if (< (vector-length fwd) (meters 0.5))
         (vector-z-quaternion! fwd (-> *target* control quat)))
       (vector-normalize! fwd 1.0)
-      (vector+*! p p fwd (meters 40.0)))
+      (vector+*! p p fwd (meters 45.0))
+
+      (let ((away (new 'stack-no-clear 'vector)))
+      (vector-! away p (-> *target* control trans))
+      (set! (-> away y) 0.0)
+      (vector-normalize! away 1.0)
+      (vector+*! vel vel away (meters 12.0)))
+    )
 
     (when proc
 
@@ -800,13 +810,20 @@
       (-> *target* control trans)
       *bh-center*)
 
-    (set! bh-difficulty-scale (+ 1.0 bh-difficulty))
-    (set! bh-difficulty-scale-higher (+ 1.0 (* 1.25 bh-difficulty)))
-    (set! bh-difficulty-scale-half (+ 1.0 (* 0.5 bh-difficulty)))
-    (set! bh-difficulty-scale-third (+ 1.0 (* 0.33 bh-difficulty)))
-    (set! bh-difficulty-scale-quartre (+ 1.0 (* 0.25 bh-difficulty)))
-    (set! bh-difficulty-scale-lesser (+ 1.0 (* 0.75 bh-difficulty)))
-    (set! bh-projectile-homing (+ 0.01 (* 60.0 bh-difficulty)))
+    ;; Effective difficulty is lower when on a bike and attack rate is also slower
+    (set! bh-difficulty-eff bh-difficulty)
+    (if (bh-on-zoomer?)
+      (set! bh-difficulty-eff (* 0.6 bh-difficulty))
+      (set! bh-next-attack-time (+ bh-next-attack-time (seconds 0.6)))
+    )
+
+    (set! bh-difficulty-scale (+ 1.0 bh-difficulty-eff))
+    (set! bh-difficulty-scale-higher (+ 1.0 (* 1.25 bh-difficulty-eff)))
+    (set! bh-difficulty-scale-half (+ 1.0 (* 0.5 bh-difficulty-eff)))
+    (set! bh-difficulty-scale-third (+ 1.0 (* 0.33 bh-difficulty-eff)))
+    (set! bh-difficulty-scale-quartre (+ 1.0 (* 0.25 bh-difficulty-eff)))
+    (set! bh-difficulty-scale-lesser (+ 1.0 (* 0.75 bh-difficulty-eff)))
+    (set! bh-projectile-homing (+ 0.01 (* 60.0 bh-difficulty-eff)))
 
     ;; Choose between currently unlocked patterns.
     (let* ((patternCount (min (bh-get-unlocked-patterns) bh-implemented-patterns))
@@ -825,7 +842,7 @@
             (the int (* 3.0 bh-difficulty-scale))       ;; Amount
             *bh-spin*
             (/ (meters 25.0) bh-difficulty-scale-half)  ;; Distance
-            (- 2.3 (* 0.65 bh-difficulty))                 ;; Lifetime
+            (- 2.3 (* 0.65 bh-difficulty-eff))                 ;; Lifetime
             (* (meters 10.5) bh-difficulty-scale)       ;; Speed
           )
         )
@@ -835,7 +852,7 @@
             (the int (* 3.0 bh-difficulty-scale))       ;; Amount
             (/ (meters 20.0) bh-difficulty-scale-third)  ;; Distance Spacing
             (meters 14.0)                               ;; Height
-            (- 2.7 (* 0.5 bh-difficulty))              ;; Lifetime
+            (- 2.7 (* 0.5 bh-difficulty-eff))              ;; Lifetime
             (* (meters 9.0) bh-difficulty-scale-quartre)       ;; Speed
             )
         )
@@ -843,7 +860,7 @@
           (bh-sniper
             (/ (meters 25.0) bh-difficulty-scale-quartre)     ;; Distance
             (/ (meters 12.0) bh-difficulty-scale-half)      ;; Height
-            (- 2.6 (* 0.65 bh-difficulty))                  ;; Lifetime
+            (- 2.6 (* 0.65 bh-difficulty-eff))                  ;; Lifetime
             (* (meters 17.0) bh-difficulty-scale-third)     ;; Speed
             (+ 90.0 bh-projectile-homing)                   ;; Homing
             )
@@ -853,7 +870,7 @@
             (/ (meters 23.0) bh-difficulty-scale-third)     ;; Distance
             (/ (meters 8.0) bh-difficulty-scale-quartre)    ;; Height
             (/ (meters 20.0) bh-difficulty-scale-third)     ;; Side distance
-            (- 2.7 (* 0.6 bh-difficulty))                  ;; Lifetime
+            (- 2.7 (* 0.6 bh-difficulty-eff))                  ;; Lifetime
             (* (meters 15.0) bh-difficulty-scale-third)     ;; Speed
             (+ 80.0 bh-projectile-homing)                   ;; Homing
             )
@@ -865,7 +882,7 @@
             (/ (meters 4.0) bh-difficulty-scale-half)        ;; Safe space
             (/ (meters 12.0) bh-difficulty-scale-half)       ;; Distance Spacing
             (meters 2.0)                                     ;; Height
-            (- 2.5 (* 0.5 bh-difficulty))                    ;; Lifetime
+            (- 2.5 (* 0.5 bh-difficulty-eff))                    ;; Lifetime
             (* (meters 3.0) bh-difficulty-scale-half)        ;; Speed
             (+ 20.0 (* bh-projectile-homing 0.125))           ;; Homing
             )
@@ -875,17 +892,17 @@
             *bh-center*
             (the int (* 3.0 bh-difficulty-scale-third))      ;; Amount
             (/ (meters 12.0) bh-difficulty-scale-quartre)    ;; Distance
-            (- 2.0 (* 0.5 bh-difficulty))                    ;; Lifetime
+            (- 2.0 (* 0.5 bh-difficulty-eff))                    ;; Lifetime
             (* (meters 1.0) bh-difficulty-scale-half)        ;; Speed
             (+ 10.0 (* bh-projectile-homing 0.25))           ;; Homing
             )
         )
         ((6)
           (bh-trail-start
-            (- 2.0 (* 0.25 bh-difficulty))                    ;; Duration
+            (- 2.0 (* 0.25 bh-difficulty-eff))                    ;; Duration
             (/ 0.4 bh-difficulty-scale-half)                  ;; Rate
             (/ 0.75 bh-difficulty-scale-third)               ;; Delay
-            (- 1.25 (* 0.25 bh-difficulty))                   ;; Lifetime
+            (- 1.25 (* 0.25 bh-difficulty-eff))                   ;; Lifetime
             (* (meters 4.4) bh-difficulty-scale-lesser)              ;; Speed
             (+ 20.0 (* bh-projectile-homing))                 ;; Homing
             )
@@ -893,12 +910,12 @@
         )
         ((7)
           (bh-train
-            (+ 2 (min 1 (the int (* 2.0 bh-difficulty))))           ;; bullets per row
+            (+ 2 (min 1 (the int (* 2.0 bh-difficulty-eff))))           ;; bullets per row
             (/ (meters 6.0) bh-difficulty-scale)         ;; Spacing in wall
-            (+ 2 (min 1 (the int (* 2.0 bh-difficulty))))         ;; rows per wall (2 to 3)
+            (+ 2 (min 1 (the int (* 2.0 bh-difficulty-eff))))         ;; rows per wall (2 to 3)
             (/ (meters 14.0) bh-difficulty-scale-half)       ;; distance of walls from Jak
-            (+ 1.0 (* 0.25 bh-difficulty))                 ;; inward drift
-            (- 2.5 (* 0.6 bh-difficulty))                  ;; lifetime
+            (+ 1.0 (* 0.25 bh-difficulty-eff))                 ;; inward drift
+            (- 2.5 (* 0.6 bh-difficulty-eff))                  ;; lifetime
             (* (meters 10.0) bh-difficulty-scale-third)     ;; speed
             (* (meters 4.0) bh-difficulty-scale-third)     ;; speed Step subtracting
             )     
@@ -910,7 +927,7 @@
             (the int (* 3.0 bh-difficulty-scale-quartre))       ;; Amount
             (* (meters 3.0) bh-difficulty-scale-half)        ;; Base Speed
             (* (meters 4.0) bh-difficulty-scale-half)         ;; Step Speed adding
-            (- 4.0 (* 0.5 bh-difficulty))                     ;; Lifetime
+            (- 4.0 (* 0.5 bh-difficulty-eff))                     ;; Lifetime
             (+ 10.0 (* bh-projectile-homing 0.33))            ;; Homing
             )
         )
@@ -922,7 +939,7 @@
             (* (meters 4.5) bh-difficulty-scale-lesser)         ;; Speed
             1.0         ;; Swirl 0 - 1
             (/ 1.0 bh-difficulty-scale)         ;; Spread 0 - 1
-            (- 3.5 (* 0.5 bh-difficulty))                     ;; Lifetime
+            (- 3.5 (* 0.5 bh-difficulty-eff))                     ;; Lifetime
             (+ 5.0 (* bh-projectile-homing 0.25))             ;; Homing
             )
         )
@@ -932,7 +949,7 @@
             (the int (* 6.0 bh-difficulty-scale))      ;; Amount
             (/ (meters 12.0) bh-difficulty-scale-lesser)         ;; Speed
             (/ (degrees 25.0) bh-difficulty-scale-half)         ;; Gap
-            (- 2.25 (* 0.6 bh-difficulty))                     ;; Lifetime
+            (- 2.25 (* 0.6 bh-difficulty-eff))                     ;; Lifetime
             (+ 30.0 (* bh-projectile-homing 0.75))             ;; Homing
             )
         )
@@ -941,7 +958,7 @@
             (/ (meters 16.0) bh-difficulty-scale-third)     ;; Distance
             (/ (meters 6.0) bh-difficulty-scale-quartre)    ;; Height
             (/ (meters 22.0) bh-difficulty-scale-third)     ;; Side distance
-            (- 4.2 (* 0.7 bh-difficulty))                  ;; Lifetime
+            (- 4.2 (* 0.7 bh-difficulty-eff))                  ;; Lifetime
             (* (meters 9.0) bh-difficulty-scale-quartre)     ;; Speed
             (+ 100.0 bh-projectile-homing)                   ;; Homing
             )
@@ -953,7 +970,7 @@
             (the int (* 6.0 bh-difficulty-scale))             ;; Amount
             (/ 0.45 bh-difficulty-scale)                       ;; Delay
             0.0     ;; Side
-            (- 3.0 (* 0.47 bh-difficulty))                     ;; Lifetime
+            (- 3.0 (* 0.47 bh-difficulty-eff))                     ;; Lifetime
             (* (meters 11.4) bh-difficulty-scale-quartre)     ;; Speed
             (+ 50.0 (* 0.6 bh-projectile-homing))                    ;; Homing
             )
@@ -966,7 +983,7 @@
             (* (meters 1.0) bh-difficulty-scale-half)           ;; Radius
             (the int (* 8.0 bh-difficulty-scale))            ;; Amount
             (meters 10.0)                                   ;; Lead
-            (- 2.7 (* 0.6 bh-difficulty))                  ;; Lifetime
+            (- 2.7 (* 0.6 bh-difficulty-eff))                  ;; Lifetime
             (* (meters 16.0) bh-difficulty-scale-quartre)     ;; Speed
             (* 0.54 bh-projectile-homing)                   ;; Homing
             )
@@ -1006,7 +1023,7 @@
             (* 1.0 bh-difficulty-scale)                         ;; Inwards
             0.0                                                 ;; Spin Rotation direction 0 is random
             (* (meters 13.0) bh-difficulty-scale-third)     ;; Speed
-            (- 2.5 (* 0.75 bh-difficulty))                     ;; Lifetime
+            (- 2.5 (* 0.7 bh-difficulty-eff))                     ;; Lifetime
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
         )
@@ -1016,7 +1033,7 @@
             (the int (* 3.0 bh-difficulty-scale-lesser))      ;; Amount
             (* (meters 7.5) bh-difficulty-scale-quartre)         ;; Speed
             (/ (degrees 25.0) bh-difficulty-scale-half)         ;; Gap
-            (- 5.5 (* 0.5 bh-difficulty))                     ;; Lifetime
+            (- 5.5 (* 0.5 bh-difficulty-eff))                     ;; Lifetime
             (+ 100.0 (* bh-projectile-homing 0.5))             ;; Homing
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 2.0)))
@@ -1029,7 +1046,7 @@
             *bh-spin*
             (/ (meters 20.0) bh-difficulty-scale-quartre)  ;; Distance
             (meters 0.5)      ;; Height
-            (- 3.5 (* 0.5 bh-difficulty))                 ;; Lifetime
+            (- 3.5 (* 0.5 bh-difficulty-eff))                 ;; Lifetime
             (* (meters 9.0) bh-difficulty-scale-third)       ;; Speed
             (* 0.1 bh-projectile-homing)                   ;; Homing
           )
@@ -1043,7 +1060,7 @@
             (* (meters 8.0) bh-difficulty-scale-third)       ;; Speed
             (* 0.1 bh-projectile-homing)                   ;; Homing
           )
-          (set! bh-next-attack-time (+ bh-next-attack-time (seconds (* 1.0 bh-difficulty))))
+          (set! bh-next-attack-time (+ bh-next-attack-time (seconds (* 1.0 bh-difficulty-eff))))
           (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
 
         )
@@ -1053,7 +1070,7 @@
             (the int (* 7.0 bh-difficulty-scale-half))       ;; Amount
             *bh-spin*
             (/ (meters 16.0) bh-difficulty-scale-third)  ;; Distance
-            (- 2.7 (* 0.65 bh-difficulty))                 ;; Lifetime
+            (- 2.7 (* 0.65 bh-difficulty-eff))                 ;; Lifetime
             (meters (* 1.0 bh-difficulty-scale))       ;; Speed
           )
           (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
@@ -1067,7 +1084,7 @@
             (* 0.5 bh-difficulty-scale)                         ;; Inwards
             0.0                                                 ;; Spin Rotation direction 0 is random
             (* (meters 6.0) bh-difficulty-scale-third)     ;; Speed
-            (- 4.0 (* 0.7 bh-difficulty))                     ;; Lifetime
+            (- 4.0 (* 0.7 bh-difficulty-eff))                     ;; Lifetime
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 3.0)))
         )
@@ -1078,7 +1095,7 @@
             (* (meters 2.0) bh-difficulty-scale-half)           ;; Radius
             (the int (* 12.0 bh-difficulty-scale))            ;; Amount
             (meters 18.0)                                   ;; Lead
-            (- 3.0 (* 0.63 bh-difficulty))                  ;; Lifetime
+            (- 3.0 (* 0.63 bh-difficulty-eff))                  ;; Lifetime
             (* (meters 17.0) bh-difficulty-scale-quartre)     ;; Speed
             (* 0.4 bh-projectile-homing)                   ;; Homing
             )
@@ -1088,7 +1105,7 @@
             (* (meters 2.0) bh-difficulty-scale-half)           ;; Radius
             (the int (* 12.0 bh-difficulty-scale))            ;; Amount
             (meters -18.0)                                   ;; Lead
-            (- 3.0 (* 0.63 bh-difficulty))                  ;; Lifetime
+            (- 3.0 (* 0.63 bh-difficulty-eff))                  ;; Lifetime
             (* (meters 17.0) bh-difficulty-scale-quartre)     ;; Speed
             (* 0.4 bh-projectile-homing)                   ;; Homing
             )
@@ -1136,7 +1153,7 @@
             (* (meters 4.0) bh-difficulty-scale-half)           ;; Radius
             (the int (* 12.0 bh-difficulty-scale))            ;; Amount
             (meters 20.0)                                   ;; Lead
-            (- 3.5 (* 0.6 bh-difficulty))                  ;; Lifetime
+            (- 3.5 (* 0.6 bh-difficulty-eff))                  ;; Lifetime
             (* (meters 15.5) bh-difficulty-scale-quartre)     ;; Speed
             (+ 40.0 (* bh-projectile-homing 0.25))                   ;; Homing
             )
@@ -1296,7 +1313,7 @@
   (when *debug-segment*
     (orb-placer-maintenance))
 
-  ;;(debugcheator)
+  (debugcheator)
   (bullet-hell-update)
   (bh-tint-particles)
 

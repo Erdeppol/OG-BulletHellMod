@@ -316,7 +316,7 @@
         (('die-big) (go-virtual die #t))
         (('die) (go-virtual die #f))
         (('attack 'touch)
-         (send-event proc 'attack-invinc (-> block param 0) (static-attack-info ((mode 'death))))
+         (send-event proc 'attack-invinc (-> block param 0) (static-attack-info ((mode 'normal))))
          (go-virtual die #f))))
   :code
     (behavior ()

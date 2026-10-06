@@ -2824,7 +2824,14 @@
                  ((0) (set-frame-rate! *pc-settings* 60 #t))
                  ((1) (set-frame-rate! *pc-settings* 100 #t))
                  ((2) (set-frame-rate! *pc-settings* 150 #t)))
-               (set-video-mode (-> *setting-control* default video-mode))))
+               (set-video-mode (-> *setting-control* default video-mode)))
+
+              ;; NEW ERROR HERE
+              (((game-option-type bh-mode))
+                (set! (-> *pc-settings* bh-mode)
+                      (-> *progress-carousell* int-backup)))
+            )
+              ;; ERROR
             ;; if the option has a `on-confirm` function, run it
             (when (nonzero? (-> options (-> obj option-index) on-confirm))
               ((-> options (-> obj option-index) on-confirm)))

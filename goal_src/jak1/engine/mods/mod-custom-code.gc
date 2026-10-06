@@ -33,7 +33,7 @@
 (define bh-difficulty-start 0.0)
 (define bh-difficulty-target 0.0)
 (define bh-difficulty-time 0.0)
-(define bh-difficulty-peak 80.0)
+(define bh-difficulty-peak 85.0)
 (define bh-difficulty-heal-start 0.15)
 (define bh-difficulty-heal-stop 0.95)
 (define bh-projectile-homing 0.0)
@@ -1443,6 +1443,10 @@
   (case cell-event
     (('pickup)
       (+! bh-difficulty (/ 1.0 bh-difficulty-peak))
+      ;; Picking up power cells gives 1 health
+      (set! (-> *target* fact health)
+        (fmin (-> *target* fact health-max)
+              (+ (-> *target* fact health) 1.0)))
       (bh-clear-bullets)
      )
     (('cutscene-end)

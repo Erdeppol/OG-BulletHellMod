@@ -6002,7 +6002,6 @@
   (progress-percent 31)
   (credits 32)
   (red-reverse 33)
-  (red-obverse 34)
   )
 
 (defenum font-flags
@@ -15987,6 +15986,7 @@
   (monitor)
   (controller)
   (binding-assignment)
+  (bh-mode)
   (confirmation)
   )
 

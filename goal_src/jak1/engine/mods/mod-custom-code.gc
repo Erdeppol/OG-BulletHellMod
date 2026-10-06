@@ -827,13 +827,20 @@
     (set! bh-difficulty-scale-lesser (+ 1.0 (* 0.75 bh-difficulty-eff)))
     (set! bh-projectile-homing (+ 0.01 (* 60.0 bh-difficulty-eff)))
 
+    (when (>= (-> *pc-settings* bh-mode) 2.0)
+      (set! bh-difficulty 1.0)
+    )
     ;; Choose between currently unlocked patterns.
-    (let* ((patternCount (min (bh-get-unlocked-patterns) bh-implemented-patterns))
-       (pattern (if (< bh-patterns-seen patternCount)
-                    bh-patterns-seen
-                    (rand-vu-int-count patternCount)
-                  )))
-     (set! pattern 23) ;; DEBUG
+    (let* (
+      (patternCount (if (>= (-> *pc-settings* bh-mode) 1) 
+          bh-implemented-patterns 
+          (min (bh-get-unlocked-patterns) bh-implemented-patterns)
+          ))
+      (pattern (if (< bh-patterns-seen patternCount)
+                  bh-patterns-seen
+                  (rand-vu-int-count patternCount)
+                )))
+    ;; (set! pattern 23) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -845,7 +852,7 @@
             *bh-spin*
             (/ (meters 26.0) bh-difficulty-scale-half)  ;; Distance
             (- 2.3 (* 0.65 bh-difficulty-eff))                 ;; Lifetime
-            (* (meters 10.5) bh-difficulty-scale)       ;; Speed
+            (* (meters 10.5) bh-difficulty-scale-lesser)       ;; Speed
           )
         )
         ((0)
@@ -952,7 +959,7 @@
             (the int (* 6.0 bh-difficulty-scale))      ;; Amount
             (/ (meters 12.0) bh-difficulty-scale-lesser)         ;; Speed
             (/ (degrees 25.0) bh-difficulty-scale-half)         ;; Gap
-            (- 2.25 (* 0.6 bh-difficulty-eff))                     ;; Lifetime
+            (- 2.4 (* 0.6 bh-difficulty-eff))                     ;; Lifetime
             (+ 30.0 (* bh-projectile-homing 0.75))             ;; Homing
             )
         )
@@ -1072,8 +1079,8 @@
             *bh-center*
             (the int (* 7.0 bh-difficulty-scale-half))       ;; Amount
             *bh-spin*
-            (/ (meters 16.5) bh-difficulty-scale-third)  ;; Distance
-            (- 2.7 (* 0.65 bh-difficulty-eff))                 ;; Lifetime
+            (/ (meters 17.0) bh-difficulty-scale-third)  ;; Distance
+            (- 2.9 (* 0.64 bh-difficulty-eff))                 ;; Lifetime
             (meters (* 1.0 bh-difficulty-scale))       ;; Speed
           )
           (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
@@ -1207,7 +1214,6 @@
 
   (when (>= (current-time) bh-difficulty-time)
     (set! bh-difficulty bh-difficulty-target))
-
   0)
 
 (defun bh-clear-bullets ()
@@ -1321,17 +1327,20 @@
     (bh-update-difficulty)
     (bh-trail-update)
     (bh-circle-seq-update)
+    (when (= (-> *pc-settings* bh-mode) 2.0)
+      (set! bh-difficulty 1.0)
+    )
     (when (> bh-difficulty 0.0)
       (when (>= (current-time) bh-next-attack-time)
-         (when (>= (current-time) bh-next-heal-time)
-            (bh-spawn-heal)
-            (set! bh-next-heal-time
-              (+ (current-time) (seconds bh-heal-rate)))
-              (format #t "HEAL in: ~f Seconds" bh-heal-rate)
-            )
-
+        
         (bh-spawn-pattern)
-
+        (when (>= (current-time) bh-next-heal-time)
+          (bh-spawn-heal)
+          (set! bh-next-heal-time
+            (+ (current-time) (seconds bh-heal-rate)))
+            (format #t "HEAL in: ~f Seconds" bh-heal-rate)
+          )
+        
         (+! *bh-spin* 2000.0)
 
         (set! bh-next-attack-time

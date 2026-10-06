@@ -840,7 +840,7 @@
                   bh-patterns-seen
                   (rand-vu-int-count patternCount)
                 )))
-    ;; (set! pattern 23) ;; DEBUG
+     ;;(set! pattern 16) ;; DEBUG
     (when (< bh-patterns-seen patternCount)
       (+! bh-patterns-seen 1))
       (case pattern
@@ -852,7 +852,7 @@
             *bh-spin*
             (/ (meters 26.0) bh-difficulty-scale-half)  ;; Distance
             (- 2.3 (* 0.65 bh-difficulty-eff))                 ;; Lifetime
-            (* (meters 10.5) bh-difficulty-scale-lesser)       ;; Speed
+            (* (meters 10.0) bh-difficulty-scale-lesser)       ;; Speed
           )
         )
         ((0)
@@ -959,7 +959,7 @@
             (the int (* 6.0 bh-difficulty-scale))      ;; Amount
             (/ (meters 12.0) bh-difficulty-scale-lesser)         ;; Speed
             (/ (degrees 25.0) bh-difficulty-scale-half)         ;; Gap
-            (- 2.4 (* 0.6 bh-difficulty-eff))                     ;; Lifetime
+            (- 3.0 (* 0.5 bh-difficulty-eff))                     ;; Lifetime
             (+ 30.0 (* bh-projectile-homing 0.75))             ;; Homing
             )
         )
@@ -1026,14 +1026,14 @@
         )
         ((16)
           (bh-tornado
-            (/ (meters 26.0) bh-difficulty-scale-quartre)        ;; Radius
+            (meters 27.5)        ;; Radius
             (the int (* 5.0 bh-difficulty-scale))             ;; Layers
             (the int (/ 12.0 bh-difficulty-scale))            ;; Bullet per ring
             (* (degrees 30.0) bh-difficulty-scale-third)       ;; Twist
-            (* 1.0 bh-difficulty-scale)                         ;; Inwards
+            (* 0.75 bh-difficulty-scale)                         ;; Inwards
             0.0                                                 ;; Spin Rotation direction 0 is random
-            (* (meters 13.0) bh-difficulty-scale-third)     ;; Speed
-            (- 2.5 (* 0.7 bh-difficulty-eff))                     ;; Lifetime
+            (* (meters 12.0) bh-difficulty-scale-quartre)     ;; Speed
+            (- 2.75 (* 0.6 bh-difficulty-eff))                     ;; Lifetime
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
         )
@@ -1193,10 +1193,13 @@
   (set! bh-power-cells (the int (-> *game-info* fuel)))
 
   (set! bh-difficulty-target
+      (if (>= bh-power-cells 100)
+        0.0
         (fmax 0.0
           (fmin 1.0
             (/ (the float bh-power-cells)
                bh-difficulty-peak))))
+      )
 
   (when (< (current-time) bh-difficulty-time)
 

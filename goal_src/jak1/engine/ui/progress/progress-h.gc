@@ -55,7 +55,8 @@
      (video-mode 5)
      (menu 6)
      (yes-no 7)
-     (button 8)))
+     (button 8)
+     (bh-mode 9)))
   (#t
    (defenum progress-screen
      :type int64
@@ -165,6 +166,7 @@
      (monitor)
      (controller)
      (binding-assignment)
+     (bh-mode)
      (confirmation))) ;; end of PC_PORT = #t branch for enum initialization
   ) ;; end of PC_PORT cond
 

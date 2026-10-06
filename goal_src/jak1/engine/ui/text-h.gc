@@ -802,6 +802,11 @@
   (pad-x #x2002)
   (pad-square #x2003)
 
+  ;;BULLET HELL MODE
+  (bullet-hell-mode #x2004)
+  (all-patterns #x2005)
+  (max-difficulty #x2006)
+
   (save-and-load-game #x3000)
   ;; GAME-TEXT-ID ENUM ENDS
   )

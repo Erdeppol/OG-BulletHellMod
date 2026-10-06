@@ -101,6 +101,8 @@
 
 (def-progress-carousell *carousell-frame-rate-100fps* (60fps 100fps))
 
+(def-progress-carousell *carousell-bullet-hell* (normal all-patterns max-difficulty))
+
 (define *carousell-frame-rate* *carousell-frame-rate-150fps*)
 
 ;; pad remap stuff
@@ -233,6 +235,11 @@
        'boxed-array
        :type
        game-option
+       (new 'static
+            'game-option
+            :option-type (game-option-type bh-mode)
+            :name (text-id bullet-hell-mode)
+            :scale #t)
        (new 'static
             'game-option
             :option-type (game-option-type menu)
@@ -2143,6 +2150,7 @@
   (set! (-> *sound-options* 2 value-to-modify) (&-> *setting-control* default dialog-volume))
   (set! (-> *yes-no-options* 0 value-to-modify) (&-> *progress-state* yes-no-choice))
   ;; our options!
+  (set! (-> *game-options-pc* 0 value-to-modify) (&-> *pc-settings* bh-mode))
   (set! (-> *game-options-pc* 1 value-to-modify) (&-> *pc-settings* memcard-play-hints?))
   (set! (-> *game-options-pc* 2 value-to-modify) (&-> *pc-settings* subtitles?))
   (set! (-> *game-options-pc* 3 value-to-modify) (&-> *pc-settings* hinttitles?))
@@ -2296,7 +2304,8 @@
                     (game-option-type speaker)
                     (game-option-type frame-rate)
                     (game-option-type language-subtitles)
-                    (game-option-type language-text))
+                    (game-option-type language-text)
+                    (game-option-type bh-mode))
                    ;; a carousell like language
                    (if (> (-> (the-as (pointer int) (-> options (-> obj option-index) value-to-modify))) 0)
                      (+! (-> (the-as (pointer int) (-> options (-> obj option-index) value-to-modify))) -1)
@@ -2382,7 +2391,8 @@
                     (game-option-type speaker)
                     (game-option-type frame-rate)
                     (game-option-type language-subtitles)
-                    (game-option-type language-text))
+                    (game-option-type language-text)
+                    (game-option-type bh-mode))
                    ;; same thing as before. if at last, go to first. otherwise, keep going forward.
                    (if (< (-> (the-as (pointer int) (-> options (-> obj option-index) value-to-modify)))
                           (1- (length (-> *progress-carousell* current-carousell))))
@@ -2747,6 +2757,7 @@
                     (((game-option-type speaker)) (set! (-> *progress-carousell* current-carousell) *carousell-speaker*))
                     (((game-option-type frame-rate)) (set! (-> *progress-carousell* current-carousell) *carousell-frame-rate*))
                     (((game-option-type language-subtitles)) (set! (-> *progress-carousell* current-carousell) *subtitle-languages*))
+                    (((game-option-type bh-mode)) (set! (-> *progress-carousell* current-carousell) *carousell-bullet-hell*))
                     (((game-option-type language-text)) (set! (-> *progress-carousell* current-carousell) *text-languages*))))))))
            (else
             ;; an option was selected. write stuff!
@@ -3193,6 +3204,7 @@
                       (game-option-type speaker)
                       (game-option-type frame-rate)
                       (game-option-type language-subtitles)
+                      (game-option-type bh-mode)
                       (game-option-type language-text))
                      ;; crunched down to one generic function.
                      (progress-draw-carousell-from-string-list (-> *progress-carousell* current-carousell)
@@ -3259,7 +3271,8 @@
                       (game-option-type speaker)
                       (game-option-type frame-rate)
                       (game-option-type normal-inverted)
-                      (game-option-type confirmation))
+                      (game-option-type confirmation)
+                      (game-option-type bh-mode))
                      ;; slider and aspect ratio options just show their text
                      (set! option-str (lookup-text! *common-text* (-> options index name) #f)))
                     (((game-option-type on-off) (game-option-type aspect-native))

@@ -872,7 +872,7 @@
           (bh-sniper
             (/ (meters 25.0) bh-difficulty-scale-quartre)     ;; Distance
             (/ (meters 12.0) bh-difficulty-scale-half)      ;; Height
-            (- 2.6 (* 0.65 bh-difficulty-eff))                  ;; Lifetime
+            (- 2.6 (* 0.66 bh-difficulty-eff))                  ;; Lifetime
             (* (meters 17.0) bh-difficulty-scale-third)     ;; Speed
             (+ 90.0 bh-projectile-homing)                   ;; Homing
             )
@@ -880,10 +880,10 @@
         ((17)
           (bh-side-pair
             (/ (meters 23.0) bh-difficulty-scale-third)     ;; Distance
-            (/ (meters 8.0) bh-difficulty-scale-quartre)    ;; Height
+            (/ (meters 8.5) bh-difficulty-scale-quartre)    ;; Height
             (/ (meters 20.0) bh-difficulty-scale-third)     ;; Side distance
-            (- 2.7 (* 0.6 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 15.0) bh-difficulty-scale-third)     ;; Speed
+            (- 2.7 (* 0.63 bh-difficulty-eff))                  ;; Lifetime
+            (* (meters 14.0) bh-difficulty-scale-third)     ;; Speed
             (+ 80.0 bh-projectile-homing)                   ;; Homing
             )
           )
@@ -968,11 +968,11 @@
         )
         ((11)
           (bh-side-pair
-            (/ (meters 16.0) bh-difficulty-scale-third)     ;; Distance
+            (/ (meters 17.0) bh-difficulty-scale-third)     ;; Distance
             (/ (meters 6.0) bh-difficulty-scale-quartre)    ;; Height
             (/ (meters 22.0) bh-difficulty-scale-third)     ;; Side distance
             (- 4.2 (* 0.7 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 9.0) bh-difficulty-scale-quartre)     ;; Speed
+            (* (meters 8.0) bh-difficulty-scale-quartre)     ;; Speed
             (+ 100.0 bh-projectile-homing)                   ;; Homing
             )
           )

@@ -83,7 +83,7 @@
       (vector+*! vel vel away (meters 12.0)))
     )
 
-    (when proc
+    (when (and *target* proc)
 
       ((method-of-type projectile-yellow activate)
        (the-as projectile-yellow proc) *target* 'projectile-yellow (the-as pointer #x70004000))
@@ -108,7 +108,7 @@
       ;; (set! (-> (the-as projectile-yellow proc) max-turn) 0.0)
       (set! (-> (the-as projectile-yellow proc) bh-homing) homing)
       (set! (-> (the-as projectile-yellow proc) bh-nokill) lowSpeedNoKill)
-      (set! (-> (the-as projectile-yellow proc) bh-grace) (the-as int (seconds 0.33)))
+      (set! (-> (the-as projectile-yellow proc) bh-grace) (the-as int (seconds 0.4)))
       (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target)))
       
       (set! (-> *bh-handles* *bh-handle-idx*) (the-as uint64 (process->handle proc)))
@@ -317,41 +317,42 @@
   0)
 
 (defun bh-ground ((center vector) (gridSize int) (safeSpace float) (spacing float) (height float) (lifetime float) (speed float) (homing float))
-  (let* ((pos (new 'stack-no-clear 'vector))
-         (dir (new 'stack-no-clear 'vector))
-         (half (/ (- gridSize 1) 2)))
+  (when *target*
+    (let* ((pos (new 'stack-no-clear 'vector))
+          (dir (new 'stack-no-clear 'vector))
+          (half (/ (- gridSize 1) 2)))
 
-    (dotimes (x gridSize)
-      (dotimes (z gridSize)
+      (dotimes (x gridSize)
+        (dotimes (z gridSize)
 
-        (let* ((offsetX (* (the float (- x half)) spacing))
-               (offsetZ (* (the float (- z half)) spacing)))
+          (let* ((offsetX (* (the float (- x half)) spacing))
+                (offsetZ (* (the float (- z half)) spacing)))
 
-          (when (>= (+ (* offsetX offsetX)
-                         (* offsetZ offsetZ))
-                      (* safeSpace safeSpace))
+            (when (>= (+ (* offsetX offsetX)
+                          (* offsetZ offsetZ))
+                        (* safeSpace safeSpace))
 
-            (set-vector!
-              pos
-              (+ (-> center x) offsetX)
-              (+ (-> center y) height)
-              (+ (-> center z) offsetZ)
-              1.0)
+              (set-vector!
+                pos
+                (+ (-> center x) offsetX)
+                (+ (-> center y) height)
+                (+ (-> center z) offsetZ)
+                1.0)
 
-            ;; Point from the bullet toward Jak.
-            (vector-! dir (-> *target* control trans) pos)
-            (vector-normalize! dir 1.0)
+              ;; Point from the bullet toward Jak.
+              (vector-! dir (-> *target* control trans) pos)
+              (vector-normalize! dir 1.0)
 
-            (bh-spawn-bullet
-              pos
-              dir
-              lifetime
-              speed
-              (the-as uint 16)
-              homing
-              0.5
-              1))))))
-
+              (bh-spawn-bullet
+                pos
+                dir
+                lifetime
+                speed
+                (the-as uint 16)
+                homing
+                0.5
+                1))))))
+    )
   0)
 
 (defun bh-box ((center vector) (gridSize int) (distance float) (lifetime float) (speed float) (homing float))
@@ -554,42 +555,44 @@
 ;; inward = 0.0 pure train, >0 drifts toward the center so walls close in.
 ;; rows = number of rows per wall, row-gap = distance between rows
 (defun bh-train ((count int) (spacing float) (rows int) (half-size float) (inward float) (lifetime float) (speed float) (speed-step float))
-  (let ((pos (new 'stack-no-clear 'vector))
-        (dir (new 'stack-no-clear 'vector))
-        (row-gap (meters 3.5))
-        (backDistance (meters 5.0))
-        (mid (/ (the float (- count 1)) 2.0))
-        ;; Jak's facing angle, captured once when the pattern spawns
-        (facing (if *target* (y-angle (-> *target* control)) 0.0)))
-    (dotimes (side 4)
-      (let* ((ang (+ facing 8192.0 (* 16384.0 (the float side))))
-             (nx (sin ang))
-             (nz (cos ang))
-             (tx nz)
-             (tz (- nx)))
-        (dotimes (r rows)
-          (let ((height (+ (meters 1.2) (* (the float r) row-gap))))
-            (dotimes (i count)
-              (let* ((along (* (- (the float i) mid) spacing))
-                     (behind (the float (- (- count 1) i)))
-                     (raw-speed (- speed (* behind speed-step)))
-                     (b-speed (if (< raw-speed (meters 0.5)) (meters 0.5) raw-speed)))
-                (set-vector! pos
-                  (+ (-> *bh-center* x)
-                     (* nx (+ half-size backDistance))
-                     (* tx along))
-                  (+ (-> *bh-center* y) height)
-                  (+ (-> *bh-center* z)
-                     (* nz (+ half-size backDistance))
-                     (* tz along))
-                  1.0)
-                (set-vector! dir
-                             (- tx (* nx inward))
-                             0.0
-                             (- tz (* nz inward))
-                             1.0)
-                (vector-normalize! dir 1.0)
-                (bh-spawn-bullet pos dir lifetime b-speed (the-as uint 0) (* 0.5 bh-projectile-homing) 0.25 0))))))))
+  (when *target*
+    (let ((pos (new 'stack-no-clear 'vector))
+          (dir (new 'stack-no-clear 'vector))
+          (row-gap (meters 3.5))
+          (backDistance (meters 5.0))
+          (mid (/ (the float (- count 1)) 2.0))
+          ;; Jak's facing angle, captured once when the pattern spawns
+          (facing (if *target* (y-angle (-> *target* control)) 0.0)))
+      (dotimes (side 4)
+        (let* ((ang (+ facing 8192.0 (* 16384.0 (the float side))))
+              (nx (sin ang))
+              (nz (cos ang))
+              (tx nz)
+              (tz (- nx)))
+          (dotimes (r rows)
+            (let ((height (+ (meters 1.2) (* (the float r) row-gap))))
+              (dotimes (i count)
+                (let* ((along (* (- (the float i) mid) spacing))
+                      (behind (the float (- (- count 1) i)))
+                      (raw-speed (- speed (* behind speed-step)))
+                      (b-speed (if (< raw-speed (meters 0.5)) (meters 0.5) raw-speed)))
+                  (set-vector! pos
+                    (+ (-> *bh-center* x)
+                      (* nx (+ half-size backDistance))
+                      (* tx along))
+                    (+ (-> *bh-center* y) height)
+                    (+ (-> *bh-center* z)
+                      (* nz (+ half-size backDistance))
+                      (* tz along))
+                    1.0)
+                  (set-vector! dir
+                              (- tx (* nx inward))
+                              0.0
+                              (- tz (* nz inward))
+                              1.0)
+                  (vector-normalize! dir 1.0)
+                  (bh-spawn-bullet pos dir lifetime b-speed (the-as uint 0) (* 0.5 bh-projectile-homing) 0.25 0))))))))
+    )
   0)
 
 (defun bh-cross ((distance float) (spacing float) (amount int) (base-speed float) (step-speed float) (lifetime float) (homing float))
@@ -729,7 +732,7 @@
 (defun bh-wall ((columns int) (spacing float) (rows int) (row-gap float) (height float) (group int) (gap int) (speed float))
   (when *target*
     (let ((lifetime 3.0)
-          (distance (meters 25.0))
+          (distance (meters 28.0))
           (fwd (new 'stack-no-clear 'vector))
           (pos (new 'stack-no-clear 'vector))
           (dir (new 'stack-no-clear 'vector)))
@@ -825,7 +828,7 @@
     (set! bh-difficulty-scale-third (+ 1.0 (* 0.33 bh-difficulty-eff)))
     (set! bh-difficulty-scale-quartre (+ 1.0 (* 0.25 bh-difficulty-eff)))
     (set! bh-difficulty-scale-lesser (+ 1.0 (* 0.75 bh-difficulty-eff)))
-    (set! bh-projectile-homing (+ 0.01 (* 60.0 bh-difficulty-eff)))
+    (set! bh-projectile-homing (+ 0.01 (* 55.0 bh-difficulty-eff)))
 
     (when (>= (-> *pc-settings* bh-mode) 2.0)
       (set! bh-difficulty 1.0)
@@ -989,12 +992,12 @@
         ((13)
           (bh-ball
             (/ (meters 34.0) bh-difficulty-scale-quartre)     ;; Distance
-            (/ (meters 15.0) bh-difficulty-scale-half)      ;; Height
+            (/ (meters 16.0) bh-difficulty-scale-half)      ;; Height
             (* (meters 1.0) bh-difficulty-scale-half)           ;; Radius
             (the int (* 8.0 bh-difficulty-scale))            ;; Amount
             (meters 10.0)                                   ;; Lead
             (- 2.7 (* 0.6 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 16.0) bh-difficulty-scale-quartre)     ;; Speed
+            (* (meters 14.0) bh-difficulty-scale-quartre)     ;; Speed
             (* 0.54 bh-projectile-homing)                   ;; Homing
             )
           )
@@ -1007,7 +1010,7 @@
             (- (meters 1.0) bh-difficulty)                    ;; height
             2                                                 ;; group >= 1 gap decider
             1                                                 ;; Gap
-            (* (meters 11.0) bh-difficulty-scale-half)     ;; Speed
+            (* (meters 11.0) bh-difficulty-scale-third)     ;; Speed
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
         )
@@ -1020,7 +1023,7 @@
             (- (meters 0.1) bh-difficulty)                    ;; height
             1                                                 ;; group >= 1 gap decider
             0                                                 ;; Gap
-            (* (meters 13.0) bh-difficulty-scale-half)     ;; Speed
+            (* (meters 13.0) bh-difficulty-scale-third)     ;; Speed
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
         )
@@ -1100,23 +1103,23 @@
         )
         ((20)
           (bh-ball
-            (/ (meters 35.0) bh-difficulty-scale-quartre)     ;; Distance
-            (/ (meters 15.0) bh-difficulty-scale-half)      ;; Height
+            (/ (meters 37.0) bh-difficulty-scale-quartre)     ;; Distance
+            (/ (meters 16.0) bh-difficulty-scale-half)      ;; Height
             (* (meters 2.0) bh-difficulty-scale-half)           ;; Radius
             (the int (* 12.0 bh-difficulty-scale))            ;; Amount
             (meters 18.0)                                   ;; Lead
             (- 3.0 (* 0.63 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 17.0) bh-difficulty-scale-quartre)     ;; Speed
+            (* (meters 15.0) bh-difficulty-scale-quartre)     ;; Speed
             (* 0.4 bh-projectile-homing)                   ;; Homing
             )
           (bh-ball
-            (/ (meters 35.0) bh-difficulty-scale-quartre)     ;; Distance
-            (/ (meters 15.0) bh-difficulty-scale-half)      ;; Height
+            (/ (meters 36.0) bh-difficulty-scale-quartre)     ;; Distance
+            (/ (meters 16.0) bh-difficulty-scale-half)      ;; Height
             (* (meters 2.0) bh-difficulty-scale-half)           ;; Radius
             (the int (* 12.0 bh-difficulty-scale))            ;; Amount
             (meters -18.0)                                   ;; Lead
             (- 3.0 (* 0.63 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 17.0) bh-difficulty-scale-quartre)     ;; Speed
+            (* (meters 16.75) bh-difficulty-scale-quartre)     ;; Speed
             (* 0.4 bh-projectile-homing)                   ;; Homing
             )
           )
@@ -1129,7 +1132,7 @@
             (- (meters 1.0) bh-difficulty)                    ;; height
             1                                                 ;; group >= 1 gap decider
             1                                                 ;; Gap
-            (* (meters 13.0) bh-difficulty-scale-half)     ;; Speed
+            (* (meters 13.0) bh-difficulty-scale-third)     ;; Speed
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.5)))
         )
@@ -1153,7 +1156,7 @@
             (meters 6.0)                                      ;; height
             1                                                 ;; group >= 1 gap decider
             0                                                 ;; Gap
-            (* (meters 15.0) bh-difficulty-scale-half)     ;; Speed
+            (* (meters 14.0) bh-difficulty-scale-third)     ;; Speed
             )
           (bh-wall
             (the int (* 7.0 bh-difficulty-scale-half))        ;; Columns
@@ -1163,7 +1166,7 @@
             (meters 6.5)                                      ;; height
             1                                                 ;; group >= 1 gap decider
             0                                                 ;; Gap
-            (* (meters 13.0) bh-difficulty-scale-half)     ;; Speed
+            (* (meters 12.0) bh-difficulty-scale-third)     ;; Speed
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.5)))
         )
@@ -1424,15 +1427,32 @@
 
   (none))
 
+(defun bh-orb-bullet-above ((center vector) (height float) (lifetime float) (speed float))
+  (let* ((pos (new 'stack-no-clear 'vector))
+         (dir (new 'stack-no-clear 'vector)))
+    (set-vector! dir 0.0 -1.0 0.0 1.0)
+    (set-vector! pos (-> center x) (+ (-> center y) height) (-> center z) 1.0)
+    (bh-spawn-bullet pos dir lifetime speed (the-as uint 16) bh-projectile-homing 0.33 0))
+  0)
+
 (defun runs-on-orb-pickup ((parent process-tree))
-  (let* ((from-cache? (and parent (type-type? (-> parent type) orb-cache-top))))
+  ;;(let* ((from-cache? (and parent (type-type? (-> parent type) orb-cache-top))))
     ;; Code here runs on ANY orb pickup
-    (when from-cache?
+    ;; (when from-cache?
       ;; Code here runs only if the orb was from an orb cache
-      )
-    (when (not from-cache?)
+      ;; )
+    ;; (when (not from-cache?)
       ;; Code here runs only if the orb was NOT from an orb cache
-      ))
+      ;; ))
+    (when *target*
+      (pickup-collectable! (-> *target* fact) (pickup-type eco-pill) 1.0 (the-as handle #f))
+      (bh-orb-bullet-above
+              (-> *target* control trans)
+              (meters 16.0)                  ;; Height
+              (- 2.4 (* 0.67 bh-difficulty-eff))          ;; Lifetime
+              (* (meters 8.4) bh-difficulty-scale)       ;; Speed
+            )
+    )
   (none))
 
 (defun runs-on-fly-pickup ()
@@ -1444,9 +1464,11 @@
     (('pickup)
       (+! bh-difficulty (/ 1.0 bh-difficulty-peak))
       ;; Picking up power cells gives 1 health
-      (set! (-> *target* fact health)
-        (fmin (-> *target* fact health-max)
-              (+ (-> *target* fact health) 1.0)))
+      (when *target*
+        (set! (-> *target* fact health)
+          (fmin (-> *target* fact health-max)
+                (+ (-> *target* fact health) 1.0)))
+      )
       (bh-clear-bullets)
      )
     (('cutscene-end)

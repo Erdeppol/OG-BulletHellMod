@@ -984,7 +984,7 @@
             0.0     ;; Side
             (- 3.1 (* 0.47 bh-difficulty-eff))                     ;; Lifetime
             (* (meters 9.0) bh-difficulty-scale-quartre)     ;; Speed
-            (+ 50.0 (* 0.6 bh-projectile-homing))                    ;; Homing
+            (+ 50.0 (* 0.5 bh-projectile-homing))                    ;; Homing
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 2.0)))
           )

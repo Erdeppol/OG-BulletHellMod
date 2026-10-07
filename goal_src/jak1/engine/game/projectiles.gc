@@ -72,7 +72,7 @@
         (sv-72 (new 'stack-no-clear 'matrix))
         (sv-80 0))
     (set! (-> sv-72 vector 0 quad) (-> arg3 quad))
-    (when (not (logtest? (-> (the-as projectile (-> arg0 process)) options) 16))
+    (when (not (logtest? (-> (the-as projectile (-> arg0 process)) options) 16));;Something here?
       (let ((a1-1 (new 'stack-no-clear 'vector)))
         (vector-float*! a1-1 (-> arg1 move-vec) (-> arg1 best-u))
         (move-by-vector! arg0 a1-1)))
@@ -681,6 +681,9 @@
     (let ((s4-0 (new 'process 'collide-shape-prim-sphere s5-0 (the-as uint 0))))
       (set! (-> s4-0 prim-core collide-as) (collide-kind projectile))
       (set! (-> s4-0 collide-with) (collide-kind background cak-2 cak-3 crate enemy wall-object ground-object))
+      (when (logtest? (-> this options) 2048)
+        ;; bullet hell bullets don't collide with the environment, so they don't get pushed out when spawning
+        (set! (-> s4-0 collide-with) (collide-kind cak-2 cak-3 crate enemy wall-object ground-object)))
       (set! (-> s4-0 prim-core action) (collide-action solid))
       (set! (-> s4-0 prim-core offense) (collide-offense strong-attack))
       (set-vector! (-> s4-0 local-sphere) 0.0 5324.8 0.0 5324.8)

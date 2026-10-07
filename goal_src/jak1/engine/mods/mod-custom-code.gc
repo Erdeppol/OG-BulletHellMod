@@ -88,7 +88,7 @@
       ((method-of-type projectile-yellow activate)
        (the-as projectile-yellow proc) *target* 'projectile-yellow (the-as pointer #x70004000))
       ((the-as (function process function object object object object object object) run-function-in-process)
-       proc projectile-init-by-other (the-as entity-actor #f) p vel (logior options (the-as uint 512)) (the-as handle #f))
+       proc projectile-init-by-other (the-as entity-actor #f) p vel (logior options (the-as uint 2560)) (the-as handle #f))
 
       (set! (-> (the-as projectile-yellow proc) timeout)
             (the-as time-frame (seconds lifetime)))
@@ -105,7 +105,6 @@
           bulletSize))
 
       (set! (-> (the-as projectile-yellow proc) attack-mode) 'damage)
-      ;; (set! (-> (the-as projectile-yellow proc) max-turn) 0.0)
       (set! (-> (the-as projectile-yellow proc) bh-homing) homing)
       (set! (-> (the-as projectile-yellow proc) bh-nokill) lowSpeedNoKill)
       (set! (-> (the-as projectile-yellow proc) bh-grace) (the-as int (seconds 0.4)))
@@ -313,7 +312,7 @@
       (vector-! dir (-> *target* control trans) pos)
       (vector-normalize! dir 1.0)
 
-      (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 0)))
+      (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) homing 0.25 1)))
   0)
 
 (defun bh-ground ((center vector) (gridSize int) (safeSpace float) (spacing float) (height float) (lifetime float) (speed float) (homing float))
@@ -763,7 +762,7 @@
                                (+ (-> *target* control trans y) height (* (the float r) row-gap))
                                (+ cz (* rz along))
                                1.0)
-                  (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) 0.0 0.4 0)))))))))
+                  (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) 0.01 0.4 0)))))))))
     0)
 
 ;; radius   = distance of the tornado wall from Jak
@@ -873,7 +872,7 @@
             (/ (meters 25.0) bh-difficulty-scale-quartre)     ;; Distance
             (/ (meters 12.0) bh-difficulty-scale-half)      ;; Height
             (- 2.6 (* 0.66 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 17.0) bh-difficulty-scale-third)     ;; Speed
+            (* (meters 16.5) bh-difficulty-scale-quartre)     ;; Speed
             (+ 90.0 bh-projectile-homing)                   ;; Homing
             )
           )
@@ -883,8 +882,8 @@
             (/ (meters 8.5) bh-difficulty-scale-quartre)    ;; Height
             (/ (meters 20.0) bh-difficulty-scale-third)     ;; Side distance
             (- 2.7 (* 0.63 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 14.0) bh-difficulty-scale-third)     ;; Speed
-            (+ 80.0 bh-projectile-homing)                   ;; Homing
+            (* (meters 12.5) bh-difficulty-scale-quartre)     ;; Speed
+            (+ 70.0 bh-projectile-homing)                   ;; Homing
             )
           )
         ((4)
@@ -972,7 +971,7 @@
             (/ (meters 6.0) bh-difficulty-scale-quartre)    ;; Height
             (/ (meters 22.0) bh-difficulty-scale-third)     ;; Side distance
             (- 4.2 (* 0.7 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 8.0) bh-difficulty-scale-quartre)     ;; Speed
+            (* (meters 7.0) bh-difficulty-scale-quartre)     ;; Speed
             (+ 100.0 bh-projectile-homing)                   ;; Homing
             )
           )
@@ -983,21 +982,21 @@
             (the int (* 6.0 bh-difficulty-scale))             ;; Amount
             (/ 0.45 bh-difficulty-scale)                       ;; Delay
             0.0     ;; Side
-            (- 3.0 (* 0.47 bh-difficulty-eff))                     ;; Lifetime
-            (* (meters 11.4) bh-difficulty-scale-quartre)     ;; Speed
+            (- 3.1 (* 0.47 bh-difficulty-eff))                     ;; Lifetime
+            (* (meters 9.0) bh-difficulty-scale-quartre)     ;; Speed
             (+ 50.0 (* 0.6 bh-projectile-homing))                    ;; Homing
             )
-            (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.5)))
+            (set! bh-next-attack-time (+ bh-next-attack-time (seconds 2.0)))
           )
         ((13)
           (bh-ball
-            (/ (meters 34.0) bh-difficulty-scale-quartre)     ;; Distance
+            (/ (meters 35.0) bh-difficulty-scale-quartre)     ;; Distance
             (/ (meters 16.0) bh-difficulty-scale-half)      ;; Height
             (* (meters 1.0) bh-difficulty-scale-half)           ;; Radius
             (the int (* 8.0 bh-difficulty-scale))            ;; Amount
             (meters 10.0)                                   ;; Lead
             (- 2.7 (* 0.6 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 14.0) bh-difficulty-scale-quartre)     ;; Speed
+            (* (meters 13.0) bh-difficulty-scale-quartre)     ;; Speed
             (* 0.54 bh-projectile-homing)                   ;; Homing
             )
           )
@@ -1109,17 +1108,17 @@
             (the int (* 12.0 bh-difficulty-scale))            ;; Amount
             (meters 18.0)                                   ;; Lead
             (- 3.0 (* 0.63 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 15.0) bh-difficulty-scale-quartre)     ;; Speed
+            (* (meters 14.0) bh-difficulty-scale-quartre)     ;; Speed
             (* 0.4 bh-projectile-homing)                   ;; Homing
             )
           (bh-ball
-            (/ (meters 36.0) bh-difficulty-scale-quartre)     ;; Distance
+            (/ (meters 37.0) bh-difficulty-scale-quartre)     ;; Distance
             (/ (meters 16.0) bh-difficulty-scale-half)      ;; Height
             (* (meters 2.0) bh-difficulty-scale-half)           ;; Radius
             (the int (* 12.0 bh-difficulty-scale))            ;; Amount
             (meters -18.0)                                   ;; Lead
             (- 3.0 (* 0.63 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 16.75) bh-difficulty-scale-quartre)     ;; Speed
+            (* (meters 14.0) bh-difficulty-scale-quartre)     ;; Speed
             (* 0.4 bh-projectile-homing)                   ;; Homing
             )
           )
@@ -1178,7 +1177,7 @@
             (the int (* 12.0 bh-difficulty-scale))            ;; Amount
             (meters 20.0)                                   ;; Lead
             (- 3.5 (* 0.6 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 15.5) bh-difficulty-scale-quartre)     ;; Speed
+            (* (meters 15.0) bh-difficulty-scale-quartre)     ;; Speed
             (+ 40.0 (* bh-projectile-homing 0.25))                   ;; Homing
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 2.5)))
@@ -1344,7 +1343,6 @@
           (bh-spawn-heal)
           (set! bh-next-heal-time
             (+ (current-time) (seconds bh-heal-rate)))
-            (format #t "HEAL in: ~f Seconds" bh-heal-rate)
           )
         
         (+! *bh-spin* 2000.0)

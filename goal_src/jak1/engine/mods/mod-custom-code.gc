@@ -58,7 +58,6 @@
 
 ;; spawn one bullet that can hurt Jak
 (defun bh-spawn-bullet ((pos vector) (dir vector) (lifetime float) (speed float) (options uint) (homing float) (bulletSize float) (lowSpeedNoKill int))
-
   (let ((vel (new 'stack-no-clear 'vector))
         (p (new 'stack-no-clear 'vector))
         (fwd (new 'stack-no-clear 'vector))
@@ -85,7 +84,6 @@
     )
 
     (when (and *target* proc)
-
       ((method-of-type projectile-yellow activate)
        (the-as projectile-yellow proc) *target* 'projectile-yellow (the-as pointer #x70004000))
       ((the-as (function process function object object object object object object) run-function-in-process)
@@ -890,12 +888,12 @@
         ((4)
           (bh-ground
             *bh-center*
-            (the int (* 6.0 bh-difficulty-scale-half))       ;; Amount
-            (/ (meters 4.0) bh-difficulty-scale-half)        ;; Safe space
-            (/ (meters 12.0) bh-difficulty-scale-half)       ;; Distance Spacing
-            (meters 2.0)                                     ;; Height
-            (- 2.5 (* 0.5 bh-difficulty-eff))                    ;; Lifetime
-            (* (meters 3.0) bh-difficulty-scale-half)        ;; Speed
+            (+ 3 (the int (* 3.0 bh-difficulty-scale-half)))  ;; Amount
+            (/ (meters 4.0) bh-difficulty-scale-half)         ;; Safe space
+            (/ (meters 12.0) bh-difficulty-scale-half)        ;; Distance Spacing
+            (meters 2.0)                                      ;; Height
+            (- 2.5 (* 0.5 bh-difficulty-eff))                 ;; Lifetime
+            (* (meters 3.0) bh-difficulty-scale-half)         ;; Speed
             (+ 20.0 (* bh-projectile-homing 0.125))           ;; Homing
             )
         )

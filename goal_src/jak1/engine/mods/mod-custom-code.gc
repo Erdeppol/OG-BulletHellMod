@@ -37,6 +37,7 @@
 (define bh-difficulty-heal-start 0.15)
 (define bh-difficulty-heal-stop 0.95)
 (define bh-projectile-homing 0.0)
+(define bh-projectile-homing-peak 50.0)
 (define *bh-handles* (new 'global 'boxed-array uint64 512))
 (define *bh-handle-idx* 0)
 (define *bh-last-transition* #f)
@@ -827,7 +828,7 @@
     (set! bh-difficulty-scale-third (+ 1.0 (* 0.33 bh-difficulty-eff)))
     (set! bh-difficulty-scale-quartre (+ 1.0 (* 0.25 bh-difficulty-eff)))
     (set! bh-difficulty-scale-lesser (+ 1.0 (* 0.75 bh-difficulty-eff)))
-    (set! bh-projectile-homing (+ 0.01 (* 55.0 bh-difficulty-eff)))
+    (set! bh-projectile-homing (+ 0.01 (* bh-projectile-homing-peak bh-difficulty-eff)))
 
     (when (>= (-> *pc-settings* bh-mode) 2.0)
       (set! bh-difficulty 1.0)
@@ -967,7 +968,7 @@
         )
         ((11)
           (bh-side-pair
-            (/ (meters 17.0) bh-difficulty-scale-third)     ;; Distance
+            (/ (meters 18.0) bh-difficulty-scale-third)     ;; Distance
             (/ (meters 6.0) bh-difficulty-scale-quartre)    ;; Height
             (/ (meters 22.0) bh-difficulty-scale-third)     ;; Side distance
             (- 4.2 (* 0.7 bh-difficulty-eff))                  ;; Lifetime
@@ -977,14 +978,14 @@
           )
         ((12)
           (bh-circle-seq-start
-            (/ (meters 18.5) bh-difficulty-scale-quartre)     ;; Radius
+            (/ (meters 20.0) bh-difficulty-scale-quartre)     ;; Radius
             (/ (meters 9.0) bh-difficulty-scale-quartre)    ;; Height
             (the int (* 6.0 bh-difficulty-scale))             ;; Amount
             (/ 0.45 bh-difficulty-scale)                       ;; Delay
             0.0     ;; Side
             (- 3.1 (* 0.47 bh-difficulty-eff))                     ;; Lifetime
-            (* (meters 9.0) bh-difficulty-scale-quartre)     ;; Speed
-            (+ 50.0 (* 0.5 bh-projectile-homing))                    ;; Homing
+            (* (meters 8.75) bh-difficulty-scale-quartre)     ;; Speed
+            (+ 40.0 (* 0.4 bh-projectile-homing))                    ;; Homing
             )
             (set! bh-next-attack-time (+ bh-next-attack-time (seconds 2.0)))
           )
@@ -1459,18 +1460,26 @@
 ;; Spawn a dense circle of bullets around Jak that all drift upward.
 (defun bh-fly-bullet-ring ((radius float) (amount int) (height float) (lifetime float) (speed float))
   (when *target*
-    (let ((pos (new 'stack-no-clear 'vector))
-           (dir (new 'stack-no-clear 'vector))
-           (step (/ 65536.0 (the float amount))))
-      (set-vector! dir 0.0 1.0 0.0 1.0)
+    (let* ((pos (new 'stack-no-clear 'vector))
+            (dir (new 'stack-no-clear 'vector))
+            (step (/ 65536.0 (the float amount)))
+            (verticalSpeed (meters 2.5))
+            (cx (-> *target* control trans x))
+            (cz (-> *target* control trans z)))
+
       (dotimes (i amount)
-        (let ((ang (* step (the float i))))
-          (set-vector!
-            pos
-            (+ (-> *target* control trans x) (* (sin ang) radius))
-            (+ (-> *target* control trans y) height)
-            (+ (-> *target* control trans z) (* (cos ang) radius))
-            1.0)
+        (let* ((ang (* step (the float i)))
+                (dx (sin ang))
+                (dz (cos ang))
+                ;; Tangential direction around Jak.
+                (tx dz)
+                (tz (- dx))
+                ;; Convert desired vertical speed into a direction component.
+                (verticalRatio (/ verticalSpeed speed)))
+
+          (set-vector! pos (+ cx (* dx radius)) (+ (-> *target* control trans y) height) (+ cz (* dz radius)) 1.0)
+          (set-vector! dir tx verticalRatio tz 1.0)
+          (vector-normalize! dir 1.0)
           (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) bh-projectile-homing 0.33 1)))))
   0)
 
@@ -1490,7 +1499,7 @@
         (pickup-collectable! (-> *target* fact) (pickup-type eco-pill) 1.0 (the-as handle #f))
         (bh-orb-bullet-above
                 (-> *target* control trans)
-                (meters 19.0)                  ;; Height
+                (meters 18.0)                  ;; Height
                 (- 2.4 (* 0.67 bh-difficulty-eff))          ;; Lifetime
                 (* (meters 9.0) bh-difficulty-scale)       ;; Speed
               )
@@ -1502,11 +1511,11 @@
   ;; Code here runs on any scout fly pickup
   (when *target*
     (bh-fly-bullet-ring
-      (* (meters 8.0) (- 1.0 bh-difficulty-eff))    ;; Radius
+      (/ (meters 12.0) bh-difficulty-scale)    ;; Radius
       (the int (* 8.0 bh-difficulty-scale))         ;; Amount
       (meters -2.0)                                 ;; Height
-      (- 2.0 (* 0.5 bh-difficulty-eff))            ;; Lifetime
-      (* (meters 2.0) bh-difficulty-scale)))        ;; Speed
+      (- 2.25 (* 0.5 bh-difficulty-eff))            ;; Lifetime
+      (* (meters 5.0) bh-difficulty-scale)))        ;; Speed
   (none))
 
 (defun runs-on-cell-pickup ((cell-event symbol))

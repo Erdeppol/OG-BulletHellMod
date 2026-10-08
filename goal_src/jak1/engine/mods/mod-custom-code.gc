@@ -862,9 +862,9 @@
             *bh-center*
             (the int (* 3.0 bh-difficulty-scale))       ;; Amount
             (/ (meters 20.0) bh-difficulty-scale-third)  ;; Distance Spacing
-            (meters 14.0)                               ;; Height
+            (meters 16.0)                               ;; Height
             (- 2.7 (* 0.5 bh-difficulty-eff))              ;; Lifetime
-            (* (meters 9.0) bh-difficulty-scale-quartre)       ;; Speed
+            (* (meters 9.5) bh-difficulty-scale-quartre)       ;; Speed
             )
         )
         ((2)
@@ -1433,28 +1433,80 @@
     (bh-spawn-bullet pos dir lifetime speed (the-as uint 16) bh-projectile-homing 0.33 0))
   0)
 
+(define *bh-orb-ring-index* 0)
+(define *bh-orb-ring-last* 0)
+;; one bullet on a circle around Jak, flying toward him
+(defun bh-orb-bullet-ring ((radius float) (step float) (lifetime float) (speed float))
+  (when *target*
+    ;; restart the circle if no orb was picked up for 2 seconds
+    (when (>= (current-time) (+ *bh-orb-ring-last* (seconds 2.0)))
+      (set! *bh-orb-ring-index* 0))
+    (set! *bh-orb-ring-last* (current-time))
+    (let* ((ang (* step (the float *bh-orb-ring-index*)))
+           (pos (new 'stack-no-clear 'vector))
+           (dir (new 'stack-no-clear 'vector)))
+      (set-vector! pos
+                   (+ (-> *target* control trans x) (* (sin ang) radius))
+                   (+ (-> *target* control trans y) (meters 0.8))   ;; low, near feet/waist
+                   (+ (-> *target* control trans z) (* (cos ang) radius))
+                   1.0)
+      ;; fly toward Jak, horizontally
+      (set-vector! dir (- (sin ang)) 0.0 (- (cos ang)) 1.0)
+      (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) bh-projectile-homing 0.33 1)
+      (+! *bh-orb-ring-index* 1)))
+  0)
+
+;; Spawn a dense circle of bullets around Jak that all drift upward.
+(defun bh-fly-bullet-ring ((radius float) (amount int) (height float) (lifetime float) (speed float))
+  (when *target*
+    (let ((pos (new 'stack-no-clear 'vector))
+           (dir (new 'stack-no-clear 'vector))
+           (step (/ 65536.0 (the float amount))))
+      (set-vector! dir 0.0 1.0 0.0 1.0)
+      (dotimes (i amount)
+        (let ((ang (* step (the float i))))
+          (set-vector!
+            pos
+            (+ (-> *target* control trans x) (* (sin ang) radius))
+            (+ (-> *target* control trans y) height)
+            (+ (-> *target* control trans z) (* (cos ang) radius))
+            1.0)
+          (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) bh-projectile-homing 0.33 1)))))
+  0)
+
 (defun runs-on-orb-pickup ((parent process-tree))
-  ;;(let* ((from-cache? (and parent (type-type? (-> parent type) orb-cache-top))))
+  (when *target*
+    (let* ((from-cache? (and parent (type-type? (-> parent type) orb-cache-top))))
     ;; Code here runs on ANY orb pickup
-    ;; (when from-cache?
-      ;; Code here runs only if the orb was from an orb cache
-      ;; )
-    ;; (when (not from-cache?)
-      ;; Code here runs only if the orb was NOT from an orb cache
-      ;; ))
-    (when *target*
-      (pickup-collectable! (-> *target* fact) (pickup-type eco-pill) 1.0 (the-as handle #f))
-      (bh-orb-bullet-above
-              (-> *target* control trans)
-              (meters 16.0)                  ;; Height
-              (- 2.4 (* 0.67 bh-difficulty-eff))          ;; Lifetime
-              (* (meters 8.4) bh-difficulty-scale)       ;; Speed
-            )
+    
+      (when from-cache?
+        (bh-orb-bullet-ring
+          (meters 14.0)                              ;; radius
+          5461.0                                     ;; step: 65536/12, 12 bullets per full circle
+          (- 2.4 (* 0.67 bh-difficulty-eff))         ;; lifetime
+          (* (meters 9.0) bh-difficulty-scale))     ;; speed
+      )
+      (when (not from-cache?)
+        (pickup-collectable! (-> *target* fact) (pickup-type eco-pill) 1.0 (the-as handle #f))
+        (bh-orb-bullet-above
+                (-> *target* control trans)
+                (meters 20.0)                  ;; Height
+                (- 2.4 (* 0.67 bh-difficulty-eff))          ;; Lifetime
+                (* (meters 9.0) bh-difficulty-scale)       ;; Speed
+              )
+      ))
     )
   (none))
 
 (defun runs-on-fly-pickup ()
   ;; Code here runs on any scout fly pickup
+  (when *target*
+    (bh-fly-bullet-ring
+      (* (meters 8.0) (- 1.0 bh-difficulty-eff))    ;; Radius
+      (the int (* 6.0 bh-difficulty-scale))         ;; Amount
+      (meters -1.0)                                 ;; Height
+      (- 2.5 (* 0.66 bh-difficulty-eff))            ;; Lifetime
+      (* (meters 9.0) bh-difficulty-scale)))        ;; Speed
   (none))
 
 (defun runs-on-cell-pickup ((cell-event symbol))

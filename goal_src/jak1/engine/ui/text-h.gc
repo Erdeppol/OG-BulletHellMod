@@ -808,12 +808,6 @@
   (max-difficulty #x2006)
   (cell-skips #x1709)
 
-  (quick-mount #x170b)
-  (quick-mount-desc #x170c)
-
-  (skip-camera-pans #x170d)
-  (skip-camera-pans-desc #x170e)
-
   (save-and-load-game #x3000)
   ;; GAME-TEXT-ID ENUM ENDS
   )

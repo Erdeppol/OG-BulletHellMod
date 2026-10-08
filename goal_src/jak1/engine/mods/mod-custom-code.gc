@@ -1511,8 +1511,8 @@
   ;; Code here runs on any scout fly pickup
   (when *target*
     (bh-fly-bullet-ring
-      (/ (meters 12.0) bh-difficulty-scale)    ;; Radius
-      (the int (* 8.0 bh-difficulty-scale))         ;; Amount
+      (/ (meters 12.0) bh-difficulty-scale)         ;; Radius
+      (+ 8 (the int (* 3.0 bh-difficulty-scale)))         ;; Amount
       (meters -2.0)                                 ;; Height
       (- 2.25 (* 0.5 bh-difficulty-eff))            ;; Lifetime
       (* (meters 5.0) bh-difficulty-scale)))        ;; Speed

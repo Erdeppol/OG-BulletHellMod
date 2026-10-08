@@ -38,7 +38,6 @@
 (define bh-difficulty-heal-stop 0.95)
 (define bh-projectile-homing 0.0)
 (define bh-projectile-homing-peak 50.0)
-(define *bh-handles* (new 'global 'boxed-array uint64 512))
 (define *bh-handle-idx* 0)
 (define *bh-last-transition* #f)
 
@@ -935,7 +934,7 @@
           (bh-cross
             (/ (meters 19.0) bh-difficulty-scale-quartre)     ;; Distance
             (/ (meters 0.4) bh-difficulty-scale-third)        ;; Spacing
-            (the int (* 3.0 bh-difficulty-scale-quartre))       ;; Amount
+            (the int (+ 2 bh-difficulty-scale))       ;; Amount
             (* (meters 3.0) bh-difficulty-scale-half)        ;; Base Speed
             (* (meters 4.0) bh-difficulty-scale-half)         ;; Step Speed adding
             (- 4.0 (* 0.5 bh-difficulty-eff))                     ;; Lifetime
@@ -1224,8 +1223,7 @@
   (dotimes (i 512)
     (when (nonzero? (-> *bh-handles* i))
       (let ((p (handle->process (the-as handle (-> *bh-handles* i)))))
-        (when p (deactivate p)))
-      (set! (-> *bh-handles* i) (the-as uint64 0))))
+        (when p (deactivate p)))))
   (set! *bh-trail-active* #f)
   (set! *bh-trail-count* 0)
   0)
@@ -1497,7 +1495,7 @@
         (pickup-collectable! (-> *target* fact) (pickup-type eco-pill) 1.0 (the-as handle #f))
         (bh-orb-bullet-above
                 (-> *target* control trans)
-                (meters 18.0)                  ;; Height
+                (meters 19.0)                             ;; Height
                 (- 2.4 (* 0.67 bh-difficulty-eff))          ;; Lifetime
                 (* (meters 9.0) bh-difficulty-scale)       ;; Speed
               )

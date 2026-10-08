@@ -701,6 +701,7 @@
   0
   (none))
 
+(define *bh-handles* (new 'global 'boxed-array uint64 512))
 (defstate projectile-die (projectile)
   :virtual #t
   :code
@@ -710,6 +711,14 @@
 
 (defmethod deactivate ((this projectile))
   (if (nonzero? (-> this sound-id)) (sound-stop (-> this sound-id)))
+
+  ;; Remove Bullet Hell projectiles from our handle list.
+  (when (> (-> this bh-homing) 0.0)
+    (dotimes (i 512)
+      (when (= (-> *bh-handles* i)
+                (the-as uint64 (process->handle this)))
+        (set! (-> *bh-handles* i) (the-as uint64 0)))))
+
   ((method-of-type process-drawable deactivate) this)
   (none))
 

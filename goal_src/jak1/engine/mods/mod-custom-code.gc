@@ -1338,11 +1338,11 @@
       (when (>= (current-time) bh-next-attack-time)
         
         (bh-spawn-pattern)
-        (when (>= (current-time) bh-next-heal-time)
-          (bh-spawn-heal)
-          (set! bh-next-heal-time
-            (+ (current-time) (seconds bh-heal-rate)))
-          )
+        ;; (when (>= (current-time) bh-next-heal-time)
+          ;; (bh-spawn-heal)
+          ;; (set! bh-next-heal-time
+            ;; (+ (current-time) (seconds bh-heal-rate)))
+          ;; )
         
         (+! *bh-spin* 2000.0)
 
@@ -1514,6 +1514,7 @@
       (meters -2.0)                                 ;; Height
       (- 2.25 (* 0.5 bh-difficulty-eff))            ;; Lifetime
       (* (meters 5.0) bh-difficulty-scale)))        ;; Speed
+      (pickup-collectable! (-> *target* fact) (pickup-type eco-pill) 5.0 (the-as handle #f))
   (none))
 
 (defun runs-on-cell-pickup ((cell-event symbol))
@@ -1522,10 +1523,8 @@
   )
   (+! bh-difficulty (/ 1.0 bh-difficulty-peak))
       ;; Picking up power cells gives 1 health
-      (when *target*
-        (set! (-> *target* fact health)
-          (fmin (-> *target* fact health-max)
-                (+ (-> *target* fact health) 1.0)))
+      (when *target* 
+        (set! (-> *target* fact health) (fmin (-> *target* fact health-max) (+ (-> *target* fact health) 1.0)))
       )
       (bh-clear-bullets)
   (none))

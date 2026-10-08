@@ -107,11 +107,11 @@
       (set! (-> (the-as projectile-yellow proc) bh-homing) homing)
       (set! (-> (the-as projectile-yellow proc) bh-nokill) lowSpeedNoKill)
       (set! (-> (the-as projectile-yellow proc) bh-grace) (the-as int (seconds 0.4)))
-      (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target)))
+      (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target))
       
       (set! (-> *bh-handles* *bh-handle-idx*) (the-as uint64 (process->handle proc)))
       (set! *bh-handle-idx* (logand (+ *bh-handle-idx* 1) 511))
-    )
+    ))
   0)
 
 (defun bh-ring ((center vector) (n int) (offset float) (radius float) (lifetime float) (speed float))

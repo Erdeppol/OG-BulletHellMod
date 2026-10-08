@@ -888,7 +888,7 @@
         ((4)
           (bh-ground
             *bh-center*
-            (+ 3 (the int (* 3.0 bh-difficulty-scale-half)))  ;; Amount
+            (+ 6 (the int (* 3.0 bh-difficulty-scale-half)))  ;; Amount
             (/ (meters 4.0) bh-difficulty-scale-half)         ;; Safe space
             (/ (meters 12.0) bh-difficulty-scale-half)        ;; Distance Spacing
             (meters 2.0)                                      ;; Height

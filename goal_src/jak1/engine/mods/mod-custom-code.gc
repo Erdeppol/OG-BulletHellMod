@@ -1349,8 +1349,8 @@
         (set! bh-next-attack-time
           (+ (current-time)
             (seconds
-              (fmax 2.15
-                (/ 3.5 bh-difficulty-scale)
+              (fmax 2.1
+                (/ 3.6 bh-difficulty-scale)
                 )
               )
             )

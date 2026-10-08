@@ -84,7 +84,6 @@
    (memcard-play-hints? symbol)
    (bh-mode             int)
    (skip-cells?        symbol) ; whether power cell cutscenes should be automatically skipped
-   (skip-camera-pans?  symbol) ; whether camera pans (i.e. gamcams) should be skipped when possible
    ))
 
 (define *pc-settings* (the pc-settings-jak1 #f))

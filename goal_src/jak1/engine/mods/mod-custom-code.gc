@@ -1490,7 +1490,7 @@
         (pickup-collectable! (-> *target* fact) (pickup-type eco-pill) 1.0 (the-as handle #f))
         (bh-orb-bullet-above
                 (-> *target* control trans)
-                (meters 20.0)                  ;; Height
+                (meters 19.0)                  ;; Height
                 (- 2.4 (* 0.67 bh-difficulty-eff))          ;; Lifetime
                 (* (meters 9.0) bh-difficulty-scale)       ;; Speed
               )
@@ -1503,10 +1503,10 @@
   (when *target*
     (bh-fly-bullet-ring
       (* (meters 8.0) (- 1.0 bh-difficulty-eff))    ;; Radius
-      (the int (* 6.0 bh-difficulty-scale))         ;; Amount
-      (meters -1.0)                                 ;; Height
-      (- 2.5 (* 0.66 bh-difficulty-eff))            ;; Lifetime
-      (* (meters 9.0) bh-difficulty-scale)))        ;; Speed
+      (the int (* 8.0 bh-difficulty-scale))         ;; Amount
+      (meters -2.0)                                 ;; Height
+      (- 2.0 (* 0.5 bh-difficulty-eff))            ;; Lifetime
+      (* (meters 2.0) bh-difficulty-scale)))        ;; Speed
   (none))
 
 (defun runs-on-cell-pickup ((cell-event symbol))

@@ -244,6 +244,8 @@
      (set! (-> *setting-control* default play-hints) #t)
      ;; don't allow cutscene skips
      (set! (-> *pc-settings* skip-movies?) #f)
+     ;; don't allow cutscene skips
+     (set! (-> *pc-settings* skip-cells?) #f)
      ;; spawn at the geyser warp gate checkpoint
      (initialize! *game-info* 'game (the-as game-save #f) "intro-start"))
     (else

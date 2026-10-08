@@ -536,6 +536,7 @@
     (("discord-rpc?") (set! (-> obj discord-rpc?) (file-stream-read-symbol file)))
     (("speedrunner-mode?") (set! (-> obj speedrunner-mode?) (file-stream-read-symbol file)))
     (("cutscene-skips?") (file-stream-read-symbol file)) ;; TODO remove
+    (("cell-skips?") (file-stream-read-symbol file)) ;; TODO remove
     (("first-camera-h-inverted?") (set! (-> obj first-camera-h-inverted?) (file-stream-read-symbol file)))
     (("first-camera-v-inverted?") (set! (-> obj first-camera-v-inverted?) (file-stream-read-symbol file)))
     (("third-camera-h-inverted?") (set! (-> obj third-camera-h-inverted?) (file-stream-read-symbol file)))

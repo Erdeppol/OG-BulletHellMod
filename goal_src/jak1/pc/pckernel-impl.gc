@@ -82,7 +82,10 @@
    (secrets             pc-game-secrets :inline) ;; hidden goodies and additional secrets!
    (scenes-seen         uint8 PC_SPOOL_LOG_LENGTH) ;; cutscenes that have been seen, by spool-anim (maybe use 8-char name or bits instead?)
    (memcard-play-hints? symbol)
-   (bh-mode             int)))
+   (bh-mode             int)
+   (skip-cells?        symbol) ; whether power cell cutscenes should be automatically skipped
+   (skip-camera-pans?  symbol) ; whether camera pans (i.e. gamcams) should be skipped when possible
+   ))
 
 (define *pc-settings* (the pc-settings-jak1 #f))
 
@@ -123,6 +126,7 @@
   (set! (-> obj text-language) (the pc-language (scf-get-language)))
   (set! (-> obj subtitle-language) (the pc-language (scf-get-language)))
   (set! (-> obj skip-movies?) #t)
+  (set! (-> obj skip-cells?) #t)
   (set! (-> obj subtitles?) *debug-segment*)
   (cond
     ((and (= *default-territory* GAME_TERRITORY_SCEE) (= (-> obj text-language) (pc-language english)))

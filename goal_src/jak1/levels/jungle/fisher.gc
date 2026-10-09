@@ -1047,6 +1047,7 @@
          (set! (-> self trans-hook)
                (lambda :behavior fisher ()
                  (set! *camera-look-through-other* 2)
+                 (send-event *target* 'end-mode);;SKIP
                  (when (process-grab? *target*)
                    (close-current! (-> self tasks))
                    (go-virtual play-anim))
@@ -1249,13 +1250,13 @@
   :code
     (behavior ()
       (set! *display-profile* #f)
-      ;; SKIP FISHING BULLET HELL MOD
-      (set! (-> self caught) (-> *FISHER-bank* max-caught))
-
       (set! (-> self paddle) 0.5)
       (set! (-> self paddle-vel) 0.0)
       (set-time! (-> self start-time))
       (set! (-> self caught) 0)
+      ;; SKIP FISHING BULLET HELL MOD
+      (set! (-> self caught) (-> *FISHER-bank* max-caught))
+
       (set! (-> self missed) 0)
       (set! (-> self spawner) 0.5)
       (set! (-> self spawner-last) 0.5)
@@ -1325,6 +1326,8 @@
                   (vector-copy! *camera-other-trans* *fisher-camera-backup-trans*)
                   (matrix-copy! *camera-other-matrix* *fisher-camera-backup-matrix*))
                 (none)))
+        (send-event *target* 'end-mode)
+        (process-release? *target*)
         ((-> (method-of-type process-taskable play-anim) exit))
         0
         (none))))

@@ -870,8 +870,8 @@
             (/ (meters 25.0) bh-difficulty-scale-quartre)     ;; Distance
             (/ (meters 12.0) bh-difficulty-scale-half)      ;; Height
             (- 2.6 (* 0.66 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 16.5) bh-difficulty-scale-quartre)     ;; Speed
-            (+ 90.0 bh-projectile-homing)                   ;; Homing
+            (* (meters 16.0) bh-difficulty-scale-quartre)     ;; Speed
+            (+ 60.0 bh-projectile-homing)                   ;; Homing
             )
           )
         ((17)
@@ -880,8 +880,8 @@
             (/ (meters 8.5) bh-difficulty-scale-quartre)    ;; Height
             (/ (meters 20.0) bh-difficulty-scale-third)     ;; Side distance
             (- 2.7 (* 0.63 bh-difficulty-eff))                  ;; Lifetime
-            (* (meters 12.5) bh-difficulty-scale-quartre)     ;; Speed
-            (+ 70.0 bh-projectile-homing)                   ;; Homing
+            (* (meters 12.0) bh-difficulty-scale-quartre)     ;; Speed
+            (+ 35.0 bh-projectile-homing)                   ;; Homing
             )
           )
         ((4)

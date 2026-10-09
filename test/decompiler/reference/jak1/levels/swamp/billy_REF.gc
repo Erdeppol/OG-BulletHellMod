@@ -989,7 +989,7 @@
 (defstate enter-playing (billy)
   :virtual #t
   :trans (behavior ()
-    (when (send-event *target* 'change-mode 'billy)
+    (when (send-event *target*)
       (send-event *target* 'trans 'reset)
       (let ((v1-8 (entity-actor-lookup (-> self entity) 'alt-actor 0)))
         (cond

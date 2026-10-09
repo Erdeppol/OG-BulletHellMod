@@ -660,13 +660,16 @@
       (spool-push *art-control* "billy-reject" 0 self -99.0))
   :code
     (behavior ()
-      (loop
-        (billy-game-update)
-        (if (or (zero? (-> self num-snacks))
-                (and (zero? (-> self num-rats)) (-> self passed-last-stage))
-                (and *cheat-mode* (cpad-pressed? 1 x)))
-          (go billy-done))
-        (suspend)))
+    ;; BULLET HELL SKIP
+    (go billy-done)
+      ;; (loop
+        ;; (billy-game-update)
+        ;; (if (or (zero? (-> self num-snacks))
+            ;;    (and (zero? (-> self num-rats)) (-> self passed-last-stage))
+            ;;    (and *cheat-mode* (cpad-pressed? 1 x)))
+          ;; (go billy-done))
+        ;; (suspend))
+        )
   :post
     (behavior ()
       (ja-post)))
@@ -710,6 +713,7 @@
   :exit
     (behavior ()
       (billy-kill-all-but-farthy)
+      (process-release? *target*)
       ((-> (method-of-type process-taskable play-anim) exit))))
 
 (defstate idle (billy)

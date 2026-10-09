@@ -1249,6 +1249,9 @@
   :code
     (behavior ()
       (set! *display-profile* #f)
+      ;; SKIP FISHING BULLET HELL MOD
+      (set! (-> self caught) (-> *FISHER-bank* max-caught))
+
       (set! (-> self paddle) 0.5)
       (set! (-> self paddle-vel) 0.0)
       (set-time! (-> self start-time))

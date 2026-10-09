@@ -1419,7 +1419,7 @@
   (debugcheator)
   (bullet-hell-update)
   (bh-tint-particles)
-
+  
   (none))
 
 (defun bh-orb-bullet-above ((center vector) (height float) (lifetime float) (speed float))

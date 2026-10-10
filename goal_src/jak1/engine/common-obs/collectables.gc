@@ -1039,7 +1039,7 @@
       ;;(when (or (not (-> *pc-settings* mod skip-cells?)) (and (not flutflut?) (not racer?)))
         (send-event *target* 'end-mode)
       )
-      (when *target*
+      (when (and *target* (-> *pc-settings* skip-cells?))
         (send-event *target* 'end-mode)                                  ; leave the clone/grab state
         (process-release? *target*)                                      ; give controls back
         (logclear! (-> *target* draw status) (draw-status hidden)))      ; make Jak visible

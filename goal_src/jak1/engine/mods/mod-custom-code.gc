@@ -888,7 +888,7 @@
           (bh-ground
             *bh-center*
             (+ 5 (the int (* 3.0 bh-difficulty-scale-half)))  ;; Amount
-            (/ (meters 4.0) bh-difficulty-scale-half)         ;; Safe space
+            (/ (meters 7.0) bh-difficulty-scale-third)         ;; Safe space
             (/ (meters 12.0) bh-difficulty-scale-half)        ;; Distance Spacing
             (meters 2.0)                                      ;; Height
             (- 2.5 (* 0.5 bh-difficulty-eff))                 ;; Lifetime
@@ -1228,8 +1228,11 @@
   (set! *bh-trail-count* 0)
   0)
 
+(define *bh-resume-time* 0)
+(define bh-want-to-clear 0)
 (defun bh-jak-took-damage ()
-  (bh-clear-bullets)
+  (set! bh-want-to-clear 2)
+  (set! *bh-resume-time* (the-as int (max (+ (current-time) (seconds 0.5)) (+ *bh-resume-time* (seconds 0.5)))))
 0)
 
 (define bh-base-heal-rate 13.0)
@@ -1304,9 +1307,14 @@
     )
   0)
 
-(define *bh-resume-time* 0)
 (define *bh-last-movie* #t)
 (defun bullet-hell-update ()
+  (when (> bh-want-to-clear 0)
+    (set! bh-want-to-clear (- bh-want-to-clear 1))
+    (when (= 0 bh-want-to-clear)
+      (bh-clear-bullets)
+    )
+  )
   ;; Movie no spam
   (let ((m (if (-> *setting-control* current movie) #t #f)))
   (if (and m (not *bh-last-movie*))
@@ -1486,10 +1494,10 @@
     
       (when from-cache?
         (bh-orb-bullet-ring
-          (meters 14.0)                              ;; radius
+          (meters 17.0)                              ;; radius
           5461.0                                     ;; step: 65536/12, 12 bullets per full circle
           (- 2.4 (* 0.67 bh-difficulty-eff))         ;; lifetime
-          (* (meters 9.0) bh-difficulty-scale))     ;; speed
+          (* (meters 7.0) bh-difficulty-scale))     ;; speed
       )
       (when (not from-cache?)
         (pickup-collectable! (-> *target* fact) (pickup-type eco-pill) 1.0 (the-as handle #f))

@@ -37,7 +37,7 @@
 (define bh-difficulty-heal-start 0.15)
 (define bh-difficulty-heal-stop 0.95)
 (define bh-projectile-homing 0.0)
-(define bh-projectile-homing-peak 50.0)
+(define bh-projectile-homing-peak 45.0)
 (define *bh-handle-idx* 0)
 (define *bh-last-transition* #f)
 
@@ -105,7 +105,7 @@
       (set! (-> (the-as projectile-yellow proc) attack-mode) 'damage)
       (set! (-> (the-as projectile-yellow proc) bh-homing) homing)
       (set! (-> (the-as projectile-yellow proc) bh-nokill) lowSpeedNoKill)
-      (set! (-> (the-as projectile-yellow proc) bh-grace) (the-as int (seconds 0.4)))
+      (set! (-> (the-as projectile-yellow proc) bh-grace) (the-as int (seconds 0.45)))
       (logior! (-> (the-as projectile-yellow proc) root root-prim collide-with) (collide-kind target))
       
       (set! (-> *bh-handles* *bh-handle-idx*) (the-as uint64 (process->handle proc)))
@@ -347,7 +347,7 @@
                 speed
                 (the-as uint 16)
                 homing
-                0.5
+                0.35
                 1))))))
     )
   0)
@@ -1315,6 +1315,7 @@
       (bh-clear-bullets)
     )
   )
+
   ;; Movie no spam
   (let ((m (if (-> *setting-control* current movie) #t #f)))
   (if (and m (not *bh-last-movie*))
@@ -1452,7 +1453,7 @@
            (dir (new 'stack-no-clear 'vector)))
       (set-vector! pos
                    (+ (-> *target* control trans x) (* (sin ang) radius))
-                   (+ (-> *target* control trans y) (meters 0.8))   ;; low, near feet/waist
+                   (+ (-> *target* control trans y) (meters 0.5))   ;; low, near feet/waist
                    (+ (-> *target* control trans z) (* (cos ang) radius))
                    1.0)
       ;; fly toward Jak, horizontally
@@ -1487,6 +1488,11 @@
           (bh-spawn-bullet pos dir lifetime speed (the-as uint 0) bh-projectile-homing 0.33 1)))))
   0)
 
+(defun bh-jak-launching? ()
+  (and *target*
+       (let ((st (-> *target* next-state)))
+         (and st (= (-> st name) 'target-launch)))))
+
 (defun runs-on-orb-pickup ((parent process-tree))
   (when *target*
     (let* ((from-cache? (and parent (type-type? (-> parent type) orb-cache-top))))
@@ -1494,12 +1500,12 @@
     
       (when from-cache?
         (bh-orb-bullet-ring
-          (meters 17.0)                              ;; radius
-          5461.0                                     ;; step: 65536/12, 12 bullets per full circle
-          (- 2.4 (* 0.67 bh-difficulty-eff))         ;; lifetime
-          (* (meters 7.0) bh-difficulty-scale))     ;; speed
+          (meters 18.0)                              ;; radius
+          10922.0                                     ;; step: 65536/6, 6 bullets per full circle
+          (- 2.6 (* 0.65 bh-difficulty-eff))         ;; lifetime
+          (* (meters 7.0) bh-difficulty-scale-third))     ;; speed
       )
-      (when (not from-cache?)
+      (when (and (not (bh-jak-launching?)) (not from-cache?))
         (pickup-collectable! (-> *target* fact) (pickup-type eco-pill) 1.0 (the-as handle #f))
         (bh-orb-bullet-above
                 (-> *target* control trans)

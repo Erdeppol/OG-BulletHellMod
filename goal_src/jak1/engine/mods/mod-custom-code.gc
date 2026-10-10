@@ -816,7 +816,7 @@
     (set! bh-difficulty-eff bh-difficulty)
     (if (bh-on-zoomer?)
       (set! bh-difficulty-eff (* 0.6 bh-difficulty))
-      (set! bh-next-attack-time (+ bh-next-attack-time (seconds 0.6)))
+      (set! bh-next-attack-time (+ bh-next-attack-time (seconds 0.5)))
     )
 
     (set! bh-difficulty-scale (+ 1.0 bh-difficulty-eff))
@@ -852,7 +852,7 @@
             *bh-spin*
             (/ (meters 26.0) bh-difficulty-scale-half)  ;; Distance
             (- 2.3 (* 0.65 bh-difficulty-eff))                 ;; Lifetime
-            (* (meters 10.0) bh-difficulty-scale-lesser)       ;; Speed
+            (* (meters 10.0) bh-difficulty-scale-half)       ;; Speed
           )
         )
         ((0)
@@ -1081,7 +1081,7 @@
             *bh-spin*
             (/ (meters 17.0) bh-difficulty-scale-third)  ;; Distance
             (- 2.9 (* 0.64 bh-difficulty-eff))                 ;; Lifetime
-            (meters (* 1.0 bh-difficulty-scale))       ;; Speed
+            (meters (* 1.0 bh-difficulty-scale-lesser))       ;; Speed
           )
           (set! bh-next-attack-time (+ bh-next-attack-time (seconds 1.0)))
         )

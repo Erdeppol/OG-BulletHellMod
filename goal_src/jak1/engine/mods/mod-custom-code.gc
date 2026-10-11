@@ -41,14 +41,6 @@
 (define *bh-handle-idx* 0)
 (define *bh-last-transition* #f)
 
-(defun bh-on-zoomer? ()
-  (and *target*
-       (let ((s (-> *target* state name)))
-         (or (= s 'target-racing)
-             (= s 'target-racing-jump)
-             (= s 'target-racing-falling)
-             (= s 'target-racing-get-on)
-             (= s 'target-racing-get-off)))))
 (defun bh-zoomer-transition? ()
   (and *target*
        (let ((s (-> *target* state name)))

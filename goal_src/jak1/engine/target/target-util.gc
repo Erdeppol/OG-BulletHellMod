@@ -9,6 +9,37 @@
 
 ;; DECOMP BEGINS
 
+(defun bh-on-flutflut? ()
+  (and *target*
+       (let ((s (-> *target* state name)))
+         (or (= s 'target-flut-jump)
+             (= s 'target-flut-get-walk)
+             (= s 'target-flut-air-attack)
+             (= s 'target-flut-air-attack-hit-ground)
+             (= s 'target-flut-double-jump)
+             (= s 'target-flut-falling)
+             (= s 'target-flut-grab)
+             (= s 'target-flut-hit)
+             (= s 'target-flut-hit-ground)
+             (= s 'target-flut-running-attack)
+             (= s 'target-flut-get-stance)
+             (= s 'target-flut-get-start)
+             ))))
+(defun bh-on-zoomer? ()
+  (and *target*
+       (let ((s (-> *target* state name)))
+         (or (= s 'target-racing)
+             (= s 'target-racing-bounce)
+             (= s 'target-racing-death)
+             (= s 'target-racing-grab)
+             (= s 'target-racing-hit)
+             (= s 'target-racing-smack)
+             (= s 'target-racing-start)
+             (= s 'target-racing-jump)
+             (= s 'target-racing-falling)
+             (= s 'target-racing-get-on)
+             (= s 'target-racing-get-off)))))
+
 (defskelgroup *jchar-sg*
   eichar
   eichar-lod0-jg

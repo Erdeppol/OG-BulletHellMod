@@ -60,8 +60,9 @@
       ;; Jak's horizontal movement direction, or his facing if he's stopped
       (set! (-> fwd quad) (-> *target* control transv quad))
       (set! (-> fwd y) 0.0)
-      (set! bulletSize (* 0.33 bulletSize))
+      (set! bulletSize (* 0.35 bulletSize))
       (set! homing (* 0.33 homing))
+      (set! lifetime (* 1.33 lifetime))
       (if (< (vector-length fwd) (meters 0.5))
         (vector-z-quaternion! fwd (-> *target* control quat)))
       (vector-normalize! fwd 1.0)
@@ -73,7 +74,41 @@
       (vector-normalize! away 1.0)
       (vector+*! vel vel away (meters 12.0)))
     )
+    (when (not (bh-on-zoomer?))
+      (let* ((lead (new 'stack-no-clear 'vector))
+              (speed (meters 0.0))
+              (leadDistance (meters 0.0))
+              (maxLeadDistance (meters 10.0))
+              (minLeadSpeed (meters 9.0))
+              (maxLeadSpeed (meters 25.0)))
 
+        ;; Get Jak's horizontal velocity
+        (set! (-> lead quad) (-> *target* control transv quad))
+        (set! (-> lead y) 0.0)
+        (set! speed (vector-length lead))
+
+        ;; Scale lead distance between the minimum and maximum speeds
+        (when (> speed minLeadSpeed)
+          (set! leadDistance
+            (* maxLeadDistance
+              (/ (- speed minLeadSpeed)
+                  (- maxLeadSpeed minLeadSpeed))))
+
+          ;; Cap the lead distance at 12 meters
+          (when (> leadDistance maxLeadDistance)
+            (set! leadDistance maxLeadDistance))
+
+          ;; Apply the lead in Jak's movement direction
+          (vector-normalize! lead 1.0)
+          (vector-float*! lead lead leadDistance)
+          (vector+! p p lead))
+
+        ;; Debug output
+        ;;(format #t "Jak horizontal speed: ~f m/s~%" (/ speed (meters 1.0)))
+        ;;(format #t "Bullet lead distance: ~f meters~%" (/ leadDistance (meters 1.0)))
+      )
+    )
+    
     (when (and *target* proc)
       ((method-of-type projectile-yellow activate)
        (the-as projectile-yellow proc) *target* 'projectile-yellow (the-as pointer #x70004000))

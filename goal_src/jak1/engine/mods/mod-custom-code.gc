@@ -1435,7 +1435,7 @@
         (the-as int (max bh-next-attack-time (+ (current-time) (seconds 0.05))))))
       (when (>= (current-time) bh-next-attack-time)
         
-      (when (not bh-on-elevator?)
+      (when (not (bh-on-elevator?))
         (bh-spawn-pattern)
       )
         ;; (when (>= (current-time) bh-next-heal-time)

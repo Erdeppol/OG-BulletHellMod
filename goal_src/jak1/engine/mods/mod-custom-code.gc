@@ -1379,7 +1379,15 @@
             )
       #t
       #f)))
-      
+  
+(defun bh-on-elevator? ()
+  (if (and *target*
+           (logtest? (-> *target* control status) (cshape-moving-flags onsurf))
+           (not (time-elapsed? (-> *target* control last-time-touching-actor) (seconds 0.2))))
+    (let ((proc (handle->process (-> *target* control actor-contact-handle))))
+      (if (and proc (type-type? (-> proc type) plat-button)) #t #f))
+    #f))
+
 (defun bullet-hell-update ()
   (bh-update-cannon)
   (bh-update-launch)
@@ -1427,7 +1435,9 @@
         (the-as int (max bh-next-attack-time (+ (current-time) (seconds 0.05))))))
       (when (>= (current-time) bh-next-attack-time)
         
+      (when (not bh-on-elevator?)
         (bh-spawn-pattern)
+      )
         ;; (when (>= (current-time) bh-next-heal-time)
           ;; (bh-spawn-heal)
           ;; (set! bh-next-heal-time
